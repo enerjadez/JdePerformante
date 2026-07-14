@@ -954,49 +954,46 @@
     let targetHz = 440;
     let displayHz = 440;
 
-    // ── Build dial tick marks (RPM style, 240° sweep) ─────
+    // ── Build dial tick marks — same -120°…+120° frame as needle + arc ─
     if (ticksEl) {
       ticksEl.innerHTML = "";
-      const tickCount = 24; // across 240°
+      const tickCount = 24;
       for (let i = 0; i <= tickCount; i++) {
         const t = i / tickCount;
-        // Sweep starts at 150° from top in CSS conic; ticks from -120° to +120°
-        const angle = -120 + t * 240;
+        const angle = -120 + t * 240; // matches needle angleOf()
         const tick = document.createElement("span");
         tick.className = "dial-tick" + (i % 4 === 0 ? " is-major" : "");
-        if (t > 0.75) tick.classList.add("is-hot");
-        // Position from center: rotate then offset
-        tick.style.transform = `rotate(${angle}deg) translateY(-48px)`;
+        if (t >= 0.75) tick.classList.add("is-hot");
+        tick.style.transform = `rotate(${angle}deg) translateY(-46px)`;
         ticksEl.appendChild(tick);
       }
     }
 
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+    // Shared mapping: value ↔ progress [0,1] ↔ needle degrees [-120, 120]
     const progressOf = (value) => {
       const r = RANGES[waveMode];
       return clamp((value - r.min) / (r.max - r.min), 0, 1);
     };
-
-    // Map value → needle angle (-120° empty … +120° redline)
     const angleOf = (value) => -120 + progressOf(value) * 240;
 
     const applyDialVisual = (value) => {
       const r = RANGES[waveMode];
       const p = progressOf(value);
       const ang = angleOf(value);
+      // One source of truth for needle + arc fill
       if (dial) {
-        dial.style.setProperty("--dial-angle", ang + "deg");
-        dial.style.setProperty("--dial-progress", String(p));
+        dial.style.setProperty("--dial-angle", `${ang}deg`);
+        dial.style.setProperty("--dial-progress", p.toFixed(4));
         dial.setAttribute("aria-valuemin", String(r.min));
         dial.setAttribute("aria-valuemax", String(r.max));
         dial.setAttribute("aria-valuenow", String(Math.round(value)));
       }
-      if (needle) needle.style.setProperty("--dial-angle", ang + "deg");
-      if (hzEl) {
-        hzEl.textContent =
-          waveMode === "sine" ? String(Math.round(value)) : String(Math.round(value));
+      if (needle) {
+        needle.style.setProperty("--dial-angle", `${ang}deg`);
       }
+      if (hzEl) hzEl.textContent = String(Math.round(value));
       if (unitEl) unitEl.textContent = r.unit;
       if (modeLabel) modeLabel.textContent = r.label;
     };
@@ -1035,9 +1032,8 @@
         const rect = dial.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
-        // Angle from center; 0 = up, positive CW
+        // atan2(x, -y): 0° = up, +CW — same frame as CSS rotate / angleOf
         let ang = (Math.atan2(clientX - cx, cy - clientY) * 180) / Math.PI;
-        // Map usable sweep -120..120 (bottom of dial is dead zone)
         ang = clamp(ang, -120, 120);
         const t = (ang + 120) / 240;
         const r = RANGES[waveMode];
@@ -1152,8 +1148,8 @@
         if (w < 2) resize();
         const t = (now - t0) * 0.001;
         displayHz += (targetHz - displayHz) * 0.12;
-        // Smooth needle chase
-        applyDialVisual(displayHz * 0.15 + targetHz * 0.85);
+        // Needle + arc + label all locked to the same value (no lag mismatch)
+        applyDialVisual(targetHz);
 
         ctx.fillStyle = "#070707";
         ctx.fillRect(0, 0, w, h);

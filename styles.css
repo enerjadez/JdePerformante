@@ -1168,6 +1168,7 @@ button {
 }
 
 .partner-card {
+  --partner-accent: var(--red);
   background: var(--bg-card);
   padding: 1.75rem 1.5rem;
   display: grid;
@@ -1186,11 +1187,12 @@ button {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background: var(--red);
+  width: 3px;
+  background: var(--partner-accent);
   transform: scaleY(0);
   transform-origin: bottom;
   transition: transform 0.4s var(--ease);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--partner-accent) 40%, transparent);
 }
 
 .partner-card:hover {
@@ -1207,6 +1209,11 @@ button {
   font-size: 0.7rem;
   color: var(--text-dim);
   letter-spacing: 0.1em;
+  transition: color 0.3s;
+}
+
+.partner-card:hover .partner-index {
+  color: var(--partner-accent);
 }
 
 .partner-name {
@@ -1229,15 +1236,21 @@ button {
 }
 
 .partner-card:hover .partner-arrow {
-  color: var(--red);
+  color: var(--partner-accent);
   transform: translate(3px, -3px);
 }
 
 .partner-card--cta {
-  background: linear-gradient(135deg, rgba(225, 6, 0, 0.12), transparent 60%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--partner-accent) 14%, transparent),
+    transparent 60%
+  );
 }
 
-.partner-card--cta .partner-name { color: var(--red); }
+.partner-card--cta .partner-name {
+  color: var(--partner-accent);
+}
 
 @media (max-width: 640px) {
   .partner-grid { grid-template-columns: 1fr; }

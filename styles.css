@@ -639,7 +639,13 @@ button {
 
 .char:nth-child(1) { animation-delay: 0.85s; }
 .char:nth-child(2) { animation-delay: 0.95s; }
-.char:nth-child(3) { animation-delay: 1.05s; color: var(--red); }
+.char:nth-child(3) {
+  animation-delay: 1.05s;
+  color: #b30000; /* strong blood red */
+  text-shadow:
+    0 0 18px rgba(179, 0, 0, 0.55),
+    0 0 2px rgba(90, 0, 0, 0.8);
+}
 
 @keyframes charIn {
   to {

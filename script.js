@@ -138,31 +138,42 @@
   ];
 
   function runBoot() {
-    if (!boot || reduceMotion || perfLite) {
-      boot?.classList.add("done");
+    // Always show splash on refresh (desktop + mobile). Skip only for a11y.
+    if (!boot) return Promise.resolve();
+    if (reduceMotion) {
+      boot.classList.add("done");
       return Promise.resolve();
     }
+
+    boot.classList.remove("done");
+    if (bootFill) bootFill.style.width = "0%";
+    if (bootStatus) bootStatus.textContent = bootMsgs[0];
+
     return new Promise((resolve) => {
       let p = 0;
       let msgI = 0;
+      // ~1.4–1.8s progress + hold — visible on every hard refresh
       const tick = () => {
-        p = Math.min(100, p + Math.random() * 16 + 6);
+        p = Math.min(100, p + Math.random() * 7 + 3.5);
         if (bootFill) bootFill.style.width = p + "%";
         const nextMsg = Math.floor((p / 100) * (bootMsgs.length - 1));
         if (nextMsg !== msgI && bootStatus) {
           msgI = nextMsg;
           bootStatus.textContent = bootMsgs[msgI];
         }
-        if (p < 100) setTimeout(tick, 35);
-        else {
-          bootStatus && (bootStatus.textContent = bootMsgs[bootMsgs.length - 1]);
+        if (p < 100) {
+          setTimeout(tick, 55 + Math.random() * 40);
+        } else {
+          if (bootStatus) bootStatus.textContent = bootMsgs[bootMsgs.length - 1];
+          if (bootFill) bootFill.style.width = "100%";
           setTimeout(() => {
             boot.classList.add("done");
-            resolve();
-          }, 160);
+            // Wait for CSS fade before resolving engines
+            setTimeout(resolve, 450);
+          }, 420);
         }
       };
-      setTimeout(tick, 60);
+      setTimeout(tick, 120);
     });
   }
 

@@ -1487,7 +1487,7 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  // DNA double helix (interactive 3D)
+  // DNA double helix (interactive 3D) — robust resize + draw
   // ═══════════════════════════════════════════════════════
   function initDNA() {
     const canvas = document.getElementById("dna");
@@ -1495,17 +1495,11 @@
     const ctx = canvas.getContext("2d", { alpha: false });
     let w = 0,
       h = 0,
-      bufW = 0,
-      bufH = 0;
-    const orbit = { rotX: 0.25, rotY: 0.4, auto: true, dragging: false };
-    let spinT0 = performance.now();
-    let spinBaseY = 0.4;
+      bufW = -1,
+      bufH = -1;
+    const orbit = { rotX: 0.35, rotY: 0.2, auto: true, dragging: false };
 
-    const pairs = isMobile ? 20 : 28;
-    const radius = 1.0;
-    const height = 4.2;
-    const twist = Math.PI * 2.4;
-
+    const pairs = isMobile ? 18 : 24;
     const pairColors = [
       ["#e10600", "#f0f0f0"],
       ["#c084fc", "#4ade80"],
@@ -1513,17 +1507,20 @@
       ["#fb7185", "#a3e635"],
     ];
 
-    // Half-pixel snap reduces crawl/shimmer on rotating lines
-    const snap = (v) => Math.round(v * 2) / 2;
-
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
-      const cssW = Math.max(1, Math.round(rect.width));
-      const cssH = Math.max(1, Math.round(rect.height || 280));
+      // When tab is hidden, rect is 0 — use parent panel or fallback so first open isn't blank
+      let cssW = Math.round(rect.width);
+      let cssH = Math.round(rect.height);
+      if (cssW < 8 || cssH < 8) {
+        const panel = canvas.closest(".engine-panel") || canvas.parentElement;
+        const pr = panel ? panel.getBoundingClientRect() : null;
+        cssW = Math.max(cssW, Math.round(pr?.width || 0), 320);
+        cssH = Math.max(cssH, 300);
+      }
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const nextW = Math.max(1, Math.round(cssW * dpr));
-      const nextH = Math.max(1, Math.round(cssH * dpr));
-      // Only reallocate when size actually changes (ResizeObserver thrash = flicker)
+      const nextW = Math.max(2, Math.round(cssW * dpr));
+      const nextH = Math.max(2, Math.round(cssH * dpr));
       if (nextW === bufW && nextH === bufH && w === cssW && h === cssH) return;
       bufW = nextW;
       bufH = nextH;
@@ -1531,79 +1528,103 @@
       h = cssH;
       canvas.width = bufW;
       canvas.height = bufH;
+      canvas.style.width = "100%";
+      canvas.style.height = cssH + "px";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.imageSmoothingEnabled = true;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
     };
+
     onResize(resize);
     let roT = 0;
     new ResizeObserver(() => {
       clearTimeout(roT);
-      roT = setTimeout(resize, 50);
-    }).observe(canvas);
-    resize();
+      roT = setTimeout(resize, 40);
+    }).observe(canvas.parentElement || canvas);
 
+    // When DNA tab becomes visible, force a real layout size
+    const panel = document.getElementById("panel-dna");
+    if (panel && "MutationObserver" in window) {
+      new MutationObserver(() => {
+        if (!panel.hidden && panel.classList.contains("is-active")) {
+          bufW = -1;
+          requestAnimationFrame(() => {
+            resize();
+          });
+        }
+      }).observe(panel, { attributes: true, attributeFilter: ["hidden", "class"] });
+    }
+
+    resize();
     bindOrbitDrag(canvas, orbit, { sens: isMobile ? 0.024 : 0.014 });
 
-    function rotProject(x, y, z) {
-      const rotX = orbit.rotX;
-      const rotY = orbit.rotY;
-      let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
-      let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
-      y = y1;
-      z = z1;
-      let x1 = x * Math.cos(rotY) + z * Math.sin(rotY);
-      z1 = -x * Math.sin(rotY) + z * Math.cos(rotY);
-      const s = (Math.min(w, h) * 0.42) / (3.4 + z1);
+    function project(x, y, z) {
+      const rx = orbit.rotX;
+      const ry = orbit.rotY;
+      // Rotate X
+      let y1 = y * Math.cos(rx) - z * Math.sin(rx);
+      let z1 = y * Math.sin(rx) + z * Math.cos(rx);
+      // Rotate Y
+      let x1 = x * Math.cos(ry) + z1 * Math.sin(ry);
+      let z2 = -x * Math.sin(ry) + z1 * Math.cos(ry);
+      // Perspective — guard near-zero denominator
+      const depth = 4.2 + z2;
+      const scale = (Math.min(w, h) * 0.38) / Math.max(0.6, depth);
       return {
-        x: snap(w / 2 + x1 * s),
-        y: snap(h / 2 + y * s),
-        z: z1,
+        x: w * 0.5 + x1 * scale,
+        y: h * 0.5 + y1 * scale,
+        z: z2,
       };
     }
 
-    createRunner(canvas, (now) => {
-      if (w < 2) resize();
+    createRunner(canvas, () => {
+      // Always try to recover size if panel just opened
+      if (w < 16 || h < 16) {
+        resize();
+        if (w < 16 || h < 16) return;
+      }
 
       if (orbit.auto && !orbit.dragging) {
-        const elapsed = (now - spinT0) * 0.001;
-        orbit.rotY = spinBaseY + elapsed * 0.55;
-        orbit.rotX = 0.22 + Math.sin(elapsed * 0.45) * 0.1;
-      } else if (orbit.dragging) {
-        // Keep auto-spin baseline aligned when user releases
-        spinBaseY = orbit.rotY;
-        spinT0 = now;
+        orbit.rotY += 0.012;
+        orbit.rotX = 0.32 + Math.sin(performance.now() * 0.00045) * 0.12;
       }
 
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, w, h);
       ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
+
+      // Helix dimensions in model units
+      const rad = 1.05;
+      const helixH = 3.6;
+      const turns = 2.15;
 
       const backboneA = [];
       const backboneB = [];
       const rungs = [];
 
       for (let i = 0; i < pairs; i++) {
-        const u = i / (pairs - 1);
-        // Twist only — no extra rotY on angle (that double-rotated and shimmered)
-        const angle = u * twist;
-        const y = (u - 0.5) * height;
-        const ax = Math.cos(angle) * radius;
-        const az = Math.sin(angle) * radius;
-        const bx = Math.cos(angle + Math.PI) * radius;
-        const bz = Math.sin(angle + Math.PI) * radius;
-        const pa = rotProject(ax, y, az);
-        const pb = rotProject(bx, y, bz);
+        const t = pairs === 1 ? 0 : i / (pairs - 1);
+        const angle = t * turns * Math.PI * 2;
+        const y = (t - 0.5) * helixH;
+        const ax = Math.cos(angle) * rad;
+        const az = Math.sin(angle) * rad;
+        const bx = Math.cos(angle + Math.PI) * rad;
+        const bz = Math.sin(angle + Math.PI) * rad;
+        const pa = project(ax, y, az);
+        const pb = project(bx, y, bz);
         backboneA.push(pa);
         backboneB.push(pb);
-        rungs.push({ a: pa, b: pb, colors: pairColors[i % pairColors.length], z: (pa.z + pb.z) * 0.5 });
+        rungs.push({
+          a: pa,
+          b: pb,
+          colors: pairColors[i % pairColors.length],
+          z: (pa.z + pb.z) * 0.5,
+        });
       }
 
       rungs.sort((u, v) => u.z - v.z);
 
-      // Backbones first (stable solid strokes, no per-vertex alpha)
       const drawBackbone = (pts, color, width) => {
         if (pts.length < 2) return;
         ctx.beginPath();
@@ -1613,16 +1634,17 @@
         ctx.lineWidth = width;
         ctx.stroke();
       };
-      drawBackbone(backboneA, "rgba(225,6,0,0.9)", isMobile ? 2.2 : 2.6);
-      drawBackbone(backboneB, "rgba(240,240,240,0.82)", isMobile ? 2.2 : 2.6);
 
-      // Rungs — fixed alpha bands instead of globalAlpha thrash
+      // Draw backbones under rungs for a solid double-helix silhouette
+      drawBackbone(backboneA, "rgba(225,6,0,0.95)", isMobile ? 2.4 : 2.8);
+      drawBackbone(backboneB, "rgba(245,245,245,0.88)", isMobile ? 2.4 : 2.8);
+
       for (const r of rungs) {
-        const near = r.z < 0.15;
-        const midX = snap((r.a.x + r.b.x) * 0.5);
-        const midY = snap((r.a.y + r.b.y) * 0.5);
-        ctx.lineWidth = near ? 2.2 : 1.6;
-        ctx.globalAlpha = near ? 1 : 0.72;
+        const near = r.z < 0.2;
+        const midX = (r.a.x + r.b.x) * 0.5;
+        const midY = (r.a.y + r.b.y) * 0.5;
+        ctx.globalAlpha = near ? 1 : 0.7;
+        ctx.lineWidth = near ? 2.2 : 1.5;
         ctx.beginPath();
         ctx.moveTo(r.a.x, r.a.y);
         ctx.lineTo(midX, midY);
@@ -1633,7 +1655,7 @@
         ctx.lineTo(r.b.x, r.b.y);
         ctx.strokeStyle = r.colors[1];
         ctx.stroke();
-        const br = near ? 2.4 : 2;
+        const br = near ? 2.6 : 2;
         ctx.beginPath();
         ctx.arc(r.a.x, r.a.y, br, 0, Math.PI * 2);
         ctx.fillStyle = r.colors[0];
@@ -1644,21 +1666,20 @@
         ctx.fill();
       }
       ctx.globalAlpha = 1;
-
     }, 0);
   }
 
   // ═══════════════════════════════════════════════════════
-  // Chronograph
+  // Chronograph — local time
   // ═══════════════════════════════════════════════════════
   function initChrono() {
     const canvas = document.getElementById("clock");
-    const utcEl = document.getElementById("utcTime");
+    const localEl = document.getElementById("localTime");
     const deltaEl = document.getElementById("frameDelta");
     const sessionEl = document.getElementById("sessionTime");
     const renderEl = document.getElementById("renderPath");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: true, });
+    const ctx = canvas.getContext("2d", { alpha: true });
     const size = 280;
     let lastFrame = performance.now();
     const dpr = maxDpr;
@@ -1670,9 +1691,12 @@
 
     if (renderEl) renderEl.textContent = "RAF · UNCAPPED";
 
+    const pad = (n, len) => String(n).padStart(len || 2, "0");
+
     createRunner(
       canvas,
       () => {
+        // Local wall-clock (device timezone)
         const now = new Date();
         const ms = now.getMilliseconds();
         const s = now.getSeconds() + ms / 1000;
@@ -1726,15 +1750,25 @@
         ctx.fillStyle = RED;
         ctx.fill();
 
-        if (utcEl) utcEl.textContent = now.toISOString().slice(11, 23);
+        // Local time readout (not UTC)
+        if (localEl) {
+          localEl.textContent =
+            pad(now.getHours()) +
+            ":" +
+            pad(now.getMinutes()) +
+            ":" +
+            pad(now.getSeconds()) +
+            "." +
+            pad(ms, 3);
+        }
         const frameNow = performance.now();
         if (deltaEl) deltaEl.textContent = (frameNow - lastFrame).toFixed(2) + " ms";
         lastFrame = frameNow;
         if (sessionEl) {
-          const sec = (frameNow - sessionStart) / 1000 | 0;
-          const hh = String((sec / 3600) | 0).padStart(2, "0");
-          const mm = String(((sec % 3600) / 60) | 0).padStart(2, "0");
-          const ss = String(sec % 60).padStart(2, "0");
+          const sec = ((frameNow - sessionStart) / 1000) | 0;
+          const hh = pad((sec / 3600) | 0);
+          const mm = pad(((sec % 3600) / 60) | 0);
+          const ss = pad(sec % 60);
           sessionEl.textContent = `${hh}:${mm}:${ss}`;
         }
       },
@@ -1787,9 +1821,11 @@
         panel.classList.toggle("is-active", on);
         panel.hidden = !on;
       });
-      // Resize active canvases after tab switch
+      // Double rAF so layout is real before canvas resize (DNA/wireframe/etc.)
       requestAnimationFrame(() => {
-        window.dispatchEvent(new Event("resize"));
+        requestAnimationFrame(() => {
+          window.dispatchEvent(new Event("resize"));
+        });
       });
     };
 

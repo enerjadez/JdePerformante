@@ -21,6 +21,11 @@
     document.querySelectorAll(".char").forEach((c) => {
       c.style.opacity = "1";
       c.style.transform = "none";
+      // Keep blood-red E (inline styles can wash out cascade on mobile)
+      if (c.getAttribute("data-char") === "E") {
+        c.style.color = "#6b0000";
+        c.style.webkitTextFillColor = "#6b0000";
+      }
     });
     document.querySelectorAll(".hero-lede, .hero-actions").forEach((el) => {
       el.style.opacity = "1";
@@ -355,109 +360,124 @@
     }, isMobile ? 2800 : 1800);
   }
 
-  // ─── 3D stage: float + mouse parallax + touch drag ──────
+  // ─── Hero 3D stage: decorative float only (no drag UI) ──
   function initScene3d() {
     const stage = document.querySelector(".hero-3d");
-    const scene = document.getElementById("scene3d");
-    if (!stage || !scene) return;
-
-    let targetX = 0;
-    let targetY = 0;
-    let curX = 0;
-    let curY = 0;
-    let dragging = false;
-    let lastPX = 0;
-    let lastPY = 0;
-    let autoTilt = true;
-
-    const apply = () => {
-      stage.style.setProperty("--par-x", curX.toFixed(2) + "deg");
-      stage.style.setProperty("--par-y", curY.toFixed(2) + "deg");
-    };
-
-    // Desktop hover parallax (gentle)
-    if (isFine) {
-      window.addEventListener(
-        "mousemove",
-        (e) => {
-          if (dragging) return;
-          if (!autoTilt) return;
-          targetX = (e.clientY / window.innerHeight - 0.5) * -22;
-          targetY = (e.clientX / window.innerWidth - 0.5) * 32;
-        },
-        { passive: true }
-      );
-    }
-
-    // Drag / touch to spin the stage (desktop + mobile)
-    const onDown = (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      dragging = true;
-      autoTilt = false;
-      lastPX = e.clientX;
-      lastPY = e.clientY;
-      stage.classList.add("is-dragging");
-      scene.classList.add("is-dragging");
-      try {
-        stage.setPointerCapture(e.pointerId);
-      } catch (_) {}
-      e.preventDefault();
-    };
-
-    const onMove = (e) => {
-      if (!dragging) return;
-      const dx = e.clientX - lastPX;
-      const dy = e.clientY - lastPY;
-      lastPX = e.clientX;
-      lastPY = e.clientY;
-      targetY += dx * 0.45;
-      targetX -= dy * 0.35;
-      // Clamp extreme tilts
-      targetX = Math.max(-48, Math.min(48, targetX));
-      targetY = Math.max(-80, Math.min(80, targetY));
-      // Snap current toward target while dragging for snappy feel
-      curX += (targetX - curX) * 0.35;
-      curY += (targetY - curY) * 0.35;
-      apply();
-    };
-
-    const onUp = (e) => {
-      if (!dragging) return;
-      dragging = false;
-      stage.classList.remove("is-dragging");
-      scene.classList.remove("is-dragging");
-      try {
-        stage.releasePointerCapture?.(e.pointerId);
-      } catch (_) {}
-      // Ease back to auto hover after a beat
-      setTimeout(() => {
-        if (!dragging) autoTilt = true;
-      }, 1200);
-    };
-
-    stage.addEventListener("pointerdown", onDown, { passive: false });
-    stage.addEventListener("pointermove", onMove, { passive: true });
-    stage.addEventListener("pointerup", onUp, { passive: true });
-    stage.addEventListener("pointercancel", onUp, { passive: true });
-
+    if (!stage || !isFine) return;
+    let tx = 0,
+      ty = 0,
+      cx = 0,
+      cy = 0;
+    window.addEventListener(
+      "mousemove",
+      (e) => {
+        tx = (e.clientY / window.innerHeight - 0.5) * -18;
+        ty = (e.clientX / window.innerWidth - 0.5) * 26;
+      },
+      { passive: true }
+    );
     createRunner(
       stage,
       () => {
-        if (!dragging) {
-          curX += (targetX - curX) * 0.07;
-          curY += (targetY - curY) * 0.07;
-          if (autoTilt && !isFine) {
-            // Gentle auto idle tilt on mobile when not dragging
-            const t = performance.now() * 0.0004;
-            targetX = Math.sin(t) * 8;
-            targetY = Math.cos(t * 0.7) * 12;
-          }
-          apply();
-        }
+        cx += (tx - cx) * 0.06;
+        cy += (ty - cy) * 0.06;
+        stage.style.setProperty("--par-x", cx.toFixed(2) + "deg");
+        stage.style.setProperty("--par-y", cy.toFixed(2) + "deg");
       },
       0,
       true
     );
+  }
+
+  /**
+   * Smooth orbit drag for lab canvases (wireframe / lattice / DNA).
+   * Mobile-first: pointer capture, higher sensitivity, inertia, no page-scroll fight.
+   * Mutates orbit = { rotX, rotY, auto, dragging }
+   */
+  function bindOrbitDrag(canvas, orbit, options) {
+    const sens = (options && options.sens) || (isMobile ? 0.02 : 0.012);
+    const inertia = (options && options.inertia) !== false;
+    let lastX = 0;
+    let lastY = 0;
+    let velX = 0;
+    let velY = 0;
+    let pid = null;
+
+    canvas.style.touchAction = "none";
+    canvas.style.cursor = "grab";
+
+    const onDown = (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      orbit.dragging = true;
+      orbit.auto = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      velX = 0;
+      velY = 0;
+      pid = e.pointerId;
+      canvas.style.cursor = "grabbing";
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch (_) {}
+      // Prevent scroll while rotating the module
+      if (e.cancelable) e.preventDefault();
+    };
+
+    const onMove = (e) => {
+      if (!orbit.dragging || (pid != null && e.pointerId !== pid)) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      // Exponential smooth of velocity for inertia
+      velX = velX * 0.35 + dx * 0.65;
+      velY = velY * 0.35 + dy * 0.65;
+      orbit.rotY += dx * sens;
+      orbit.rotX += dy * sens;
+      // Soft clamp X so it never flips inside-out
+      orbit.rotX = Math.max(-1.35, Math.min(1.35, orbit.rotX));
+      if (e.cancelable && e.pointerType !== "mouse") e.preventDefault();
+    };
+
+    const onUp = (e) => {
+      if (pid != null && e.pointerId !== pid) return;
+      if (!orbit.dragging) return;
+      orbit.dragging = false;
+      pid = null;
+      canvas.style.cursor = "grab";
+      try {
+        canvas.releasePointerCapture?.(e.pointerId);
+      } catch (_) {}
+      // Apply residual spin then return to auto
+      if (inertia && (Math.abs(velX) > 0.4 || Math.abs(velY) > 0.4)) {
+        let frames = 0;
+        const coast = () => {
+          if (orbit.dragging || frames++ > 45) {
+            setTimeout(() => {
+              if (!orbit.dragging) orbit.auto = true;
+            }, 400);
+            return;
+          }
+          orbit.rotY += velX * sens * 0.85;
+          orbit.rotX += velY * sens * 0.85;
+          orbit.rotX = Math.max(-1.35, Math.min(1.35, orbit.rotX));
+          velX *= 0.92;
+          velY *= 0.92;
+          requestAnimationFrame(coast);
+        };
+        requestAnimationFrame(coast);
+      } else {
+        setTimeout(() => {
+          if (!orbit.dragging) orbit.auto = true;
+        }, 700);
+      }
+    };
+
+    canvas.addEventListener("pointerdown", onDown, { passive: false });
+    canvas.addEventListener("pointermove", onMove, { passive: false });
+    canvas.addEventListener("pointerup", onUp, { passive: true });
+    canvas.addEventListener("pointercancel", onUp, { passive: true });
+    // Don't use conflicting touchstart/mousemove aim — pure drag only
   }
 
   // ─── Metrics ────────────────────────────────────────────
@@ -1162,13 +1182,10 @@
   function initWireframe() {
     const canvas = document.getElementById("wireframe");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, });
+    const ctx = canvas.getContext("2d", { alpha: false });
     let w = 0,
-      h = 0,
-      rotX = 0.4,
-      rotY = 0.3,
-      auto = true;
-    let targetRot = { x: 0.4, y: 0.3 };
+      h = 0;
+    const orbit = { rotX: 0.4, rotY: 0.3, auto: true, dragging: false };
 
     const φ = (1 + Math.sqrt(5)) / 2;
     const raw = [
@@ -1213,54 +1230,12 @@
     onResize(resize);
     new ResizeObserver(resize).observe(canvas);
     resize();
-
-    const aim = (cx, cy) => {
-      const r = canvas.getBoundingClientRect();
-      targetRot.y = ((cx - r.left) / r.width - 0.5) * Math.PI;
-      targetRot.x = ((cy - r.top) / r.height - 0.5) * Math.PI;
-      auto = false;
-    };
-    if (isFine) {
-      canvas.addEventListener("mousemove", (e) => aim(e.clientX, e.clientY));
-      canvas.addEventListener("mouseleave", () => (auto = true));
-    }
-    canvas.addEventListener(
-      "touchstart",
-      (e) => {
-        const t = e.touches[0];
-        if (t) {
-          aim(t.clientX, t.clientY);
-          setTimeout(() => (auto = true), 1400);
-        }
-      },
-      { passive: true }
-    );
-
-    // Drag rotate
-    let dragging = false;
-    let lastX = 0,
-      lastY = 0;
-    canvas.addEventListener("pointerdown", (e) => {
-      dragging = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      auto = false;
-      canvas.setPointerCapture?.(e.pointerId);
-    });
-    canvas.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
-      rotY += (e.clientX - lastX) * 0.01;
-      rotX += (e.clientY - lastY) * 0.01;
-      lastX = e.clientX;
-      lastY = e.clientY;
-    });
-    canvas.addEventListener("pointerup", () => {
-      dragging = false;
-      setTimeout(() => (auto = true), 800);
-    });
+    bindOrbitDrag(canvas, orbit, { sens: isMobile ? 0.022 : 0.012 });
 
     function project(v) {
       let [x, y, z] = v;
+      const rotX = orbit.rotX;
+      const rotY = orbit.rotY;
       let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
       let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
       y = y1;
@@ -1272,12 +1247,9 @@
     }
 
     createRunner(canvas, () => {
-      if (auto) {
-        rotY += 0.01;
-        rotX += 0.004;
-      } else if (!dragging) {
-        rotX += (targetRot.x - rotX) * 0.08;
-        rotY += (targetRot.y - rotY) * 0.08;
+      if (orbit.auto && !orbit.dragging) {
+        orbit.rotY += 0.01;
+        orbit.rotX += 0.004;
       }
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, w, h);
@@ -1310,13 +1282,10 @@
   function initLattice() {
     const canvas = document.getElementById("lattice");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, });
+    const ctx = canvas.getContext("2d", { alpha: false });
     let w = 0,
-      h = 0,
-      rotX = 0.5,
-      rotY = 0.3,
-      auto = true;
-    let target = { x: 0.5, y: 0.3 };
+      h = 0;
+    const orbit = { rotX: 0.5, rotY: 0.3, auto: true, dragging: false };
     const N = perfLite ? 4 : 5;
     const points = [];
     for (let x = 0; x < N; x++)
@@ -1340,31 +1309,12 @@
     onResize(resize);
     new ResizeObserver(resize).observe(canvas);
     resize();
-
-    const aim = (cx, cy) => {
-      const r = canvas.getBoundingClientRect();
-      target.y = ((cx - r.left) / r.width - 0.5) * Math.PI * 1.2;
-      target.x = ((cy - r.top) / r.height - 0.5) * Math.PI * 0.9;
-      auto = false;
-    };
-    if (isFine) {
-      canvas.addEventListener("mousemove", (e) => aim(e.clientX, e.clientY));
-      canvas.addEventListener("mouseleave", () => (auto = true));
-    }
-    canvas.addEventListener(
-      "touchstart",
-      (e) => {
-        const t = e.touches[0];
-        if (t) {
-          aim(t.clientX, t.clientY);
-          setTimeout(() => (auto = true), 1200);
-        }
-      },
-      { passive: true }
-    );
+    bindOrbitDrag(canvas, orbit, { sens: isMobile ? 0.022 : 0.012 });
 
     function project(p) {
       let { x, y, z } = p;
+      const rotX = orbit.rotX;
+      const rotY = orbit.rotY;
       let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
       let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
       y = y1;
@@ -1376,12 +1326,9 @@
     }
 
     createRunner(canvas, () => {
-      if (auto) {
-        rotY += 0.008;
-        rotX = 0.45 + Math.sin(performance.now() * 0.0004) * 0.2;
-      } else {
-        rotX += (target.x - rotX) * 0.08;
-        rotY += (target.y - rotY) * 0.08;
+      if (orbit.auto && !orbit.dragging) {
+        orbit.rotY += 0.008;
+        orbit.rotX = 0.45 + Math.sin(performance.now() * 0.0004) * 0.2;
       }
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, w, h);
@@ -1427,14 +1374,9 @@
       h = 0,
       bufW = 0,
       bufH = 0;
-    let rotY = 0.4;
-    let rotX = 0.25;
-    let auto = true;
-    let dragging = false;
-    let lastPX = 0,
-      lastPY = 0;
-    let target = { x: 0.25, y: 0.4 };
+    const orbit = { rotX: 0.25, rotY: 0.4, auto: true, dragging: false };
     let spinT0 = performance.now();
+    let spinBaseY = 0.4;
 
     const pairs = isMobile ? 20 : 28;
     const radius = 1.0;
@@ -1479,44 +1421,11 @@
     }).observe(canvas);
     resize();
 
-    canvas.style.touchAction = "none";
-    canvas.addEventListener("pointerdown", (e) => {
-      dragging = true;
-      auto = false;
-      lastPX = e.clientX;
-      lastPY = e.clientY;
-      canvas.setPointerCapture?.(e.pointerId);
-    });
-    canvas.addEventListener("pointermove", (e) => {
-      if (!dragging) {
-        if (isFine) {
-          const r = canvas.getBoundingClientRect();
-          target.y = ((e.clientX - r.left) / r.width - 0.5) * 1.2;
-          target.x = ((e.clientY - r.top) / r.height - 0.5) * 0.8;
-          auto = false;
-        }
-        return;
-      }
-      rotY += (e.clientX - lastPX) * 0.012;
-      rotX += (e.clientY - lastPY) * 0.01;
-      rotX = Math.max(-1.1, Math.min(1.1, rotX));
-      lastPX = e.clientX;
-      lastPY = e.clientY;
-    });
-    const endDrag = () => {
-      dragging = false;
-      spinT0 = performance.now();
-      setTimeout(() => {
-        if (!dragging) auto = true;
-      }, 900);
-    };
-    canvas.addEventListener("pointerup", endDrag);
-    canvas.addEventListener("pointercancel", endDrag);
-    canvas.addEventListener("pointerleave", () => {
-      if (!dragging) auto = true;
-    });
+    bindOrbitDrag(canvas, orbit, { sens: isMobile ? 0.024 : 0.014 });
 
     function rotProject(x, y, z) {
+      const rotX = orbit.rotX;
+      const rotY = orbit.rotY;
       let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
       let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
       y = y1;
@@ -1534,14 +1443,14 @@
     createRunner(canvas, (now) => {
       if (w < 2) resize();
 
-      if (auto) {
-        // Time-based spin — stable, no per-frame float crawl from dt noise
+      if (orbit.auto && !orbit.dragging) {
         const elapsed = (now - spinT0) * 0.001;
-        rotY = 0.4 + elapsed * 0.55;
-        rotX = 0.22 + Math.sin(elapsed * 0.45) * 0.1;
-      } else if (!dragging) {
-        rotX += (target.x - rotX) * 0.06;
-        rotY += (target.y - rotY) * 0.06;
+        orbit.rotY = spinBaseY + elapsed * 0.55;
+        orbit.rotX = 0.22 + Math.sin(elapsed * 0.45) * 0.1;
+      } else if (orbit.dragging) {
+        // Keep auto-spin baseline aligned when user releases
+        spinBaseY = orbit.rotY;
+        spinT0 = now;
       }
 
       ctx.fillStyle = "#000";
@@ -1615,7 +1524,7 @@
 
       ctx.font = "10px IBM Plex Mono, monospace";
       ctx.fillStyle = "rgba(245,245,245,0.3)";
-      ctx.fillText(dragging ? "ROTATING" : "DRAG TO ROTATE", 12, h - 12);
+      ctx.fillText(orbit.dragging ? "ROTATING" : "DRAG TO ROTATE", 12, h - 12);
     }, 0);
   }
 

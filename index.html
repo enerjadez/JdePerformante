@@ -143,10 +143,20 @@
     <!-- SIGNAL STRIP -->
     <section class="signal" aria-label="Live signal">
       <canvas id="scope" class="scope-canvas" height="80" aria-hidden="true"></canvas>
-      <div class="signal-meta">
-        <span class="mono">LIVE WAVEFORM</span>
-        <span class="mono" id="scopeHz">440.0 Hz</span>
-        <span class="mono">AMPLITUDE · MODULATED</span>
+      <div class="signal-bar">
+        <div class="signal-meta">
+          <span class="mono">LIVE WAVEFORM</span>
+          <span class="mono" id="scopeHz">440.0 Hz</span>
+          <span class="mono" id="scopeModeLabel">SINE · 440</span>
+        </div>
+        <div class="wave-controls" role="group" aria-label="Waveform mode">
+          <button type="button" class="wave-btn is-active" data-wave="sine" data-hz="220">220 Hz</button>
+          <button type="button" class="wave-btn" data-wave="sine" data-hz="440">440 Hz</button>
+          <button type="button" class="wave-btn" data-wave="sine" data-hz="880">880 Hz</button>
+          <button type="button" class="wave-btn" data-wave="sine" data-hz="1760">1.7k</button>
+          <button type="button" class="wave-btn" data-wave="heartbeat" data-hz="72">♥ Heart</button>
+          <button type="button" class="wave-btn" data-wave="pulse" data-hz="120">Pulse</button>
+        </div>
       </div>
     </section>
 
@@ -198,18 +208,15 @@
           <p class="lab-caption">3D point cloud with perspective projection. Drag or move to reorient the lattice.</p>
         </article>
 
-        <!-- Module: Type machine -->
+        <!-- Module: DNA helix -->
         <article class="lab-card lab-card--wide reveal">
           <div class="lab-header">
             <span class="mono">MOD · 03</span>
-            <span class="lab-title">Kinetic Type</span>
+            <span class="lab-title">DNA Structure</span>
             <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
           </div>
-          <div class="type-machine" id="typeMachine">
-            <div class="type-display" id="typeDisplay">BEAUTY</div>
-            <div class="type-grid" id="typeGrid" aria-hidden="true"></div>
-          </div>
-          <p class="lab-caption">Character matrix morph. Timing curves engineered for weight and snap.</p>
+          <canvas id="dna" class="lab-canvas" aria-label="Interactive 3D DNA double helix"></canvas>
+          <p class="lab-caption">Double helix with base-pair rungs. Drag or touch to reorient — pure 3D projection, no libraries.</p>
         </article>
 
         <!-- Module: Chronograph -->
@@ -277,27 +284,28 @@
         target="_blank"
         rel="noopener noreferrer"
         data-magnetic
-        style="--partner-accent: #a855f7"
       >
         <div class="partner-feature-glow" aria-hidden="true"></div>
         <div class="partner-feature-top">
           <span class="partner-feature-badge mono">In partnership with</span>
           <span class="partner-feature-arrow" aria-hidden="true">↗</span>
         </div>
-        <div class="partner-feature-body">
-          <h3 class="partner-feature-name">CMR Africa</h3>
-          <p class="partner-feature-tagline">Built for making magic.</p>
-          <p class="partner-feature-copy">
-            A strategic alliance with CMR Africa — where vision, culture, and engineering
-            meet. Together we craft digital experiences that don't just perform;
-            they cast a spell. Precision systems. Cinematic presence. Magic, engineered.
-          </p>
-          <span class="partner-feature-link mono">cmrafrica.com · Explore the partnership</span>
-        </div>
-        <div class="partner-feature-mark" aria-hidden="true">
-          <span>CMR</span>
-          <span class="partner-feature-x">×</span>
-          <span>JDE</span>
+        <div class="partner-feature-inner">
+          <div class="partner-feature-body">
+            <h3 class="partner-feature-name">CMR Africa</h3>
+            <p class="partner-feature-tagline">Built for making magic.</p>
+            <p class="partner-feature-copy">
+              A strategic alliance with CMR Africa — where vision, culture, and engineering
+              meet. Together we craft digital experiences that don't just perform;
+              they cast a spell. Precision systems. Cinematic presence. Magic, engineered.
+            </p>
+            <span class="partner-feature-link mono">cmrafrica.com · Explore the partnership</span>
+          </div>
+          <div class="partner-feature-mark" aria-hidden="true">
+            <span>CMR</span>
+            <span class="partner-feature-x">×</span>
+            <span>JDE</span>
+          </div>
         </div>
       </a>
 

@@ -160,7 +160,7 @@
       </div>
     </section>
 
-    <!-- ENGINE: showcase of engineering craft -->
+    <!-- ENGINE: collapsible bay + tabbed modules -->
     <section class="section engine" id="engine">
       <div class="section-head">
         <p class="eyebrow reveal"><span class="red">01</span> — The engine</p>
@@ -169,88 +169,138 @@
           <em>A demonstration of craft.</em>
         </h2>
         <p class="section-lede reveal">
-          Move. Hover. Interact. Every system below is running in real time —
-          the same discipline we bring to products, brands, and platforms.
+          Live systems under the hood. Open the bay, switch modules —
+          each one runs in real time.
         </p>
       </div>
 
-      <div class="lab-grid">
-        <!-- Module: Vector field -->
-        <article class="lab-card lab-card--wide reveal">
-          <div class="lab-header">
-            <span class="mono">MOD · 01</span>
-            <span class="lab-title">Vector Field</span>
-            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+      <div class="engine-shell reveal">
+        <button
+          type="button"
+          class="engine-toggle"
+          id="engineToggle"
+          aria-expanded="false"
+          aria-controls="engineBay"
+        >
+          <div class="engine-toggle-meta">
+            <span class="mono engine-toggle-code">SYS · ENGINE BAY</span>
+            <span class="engine-toggle-title">Modules offline</span>
+            <span class="mono engine-toggle-count">05 SYSTEMS · COLLAPSED</span>
           </div>
-          <canvas id="vectors" class="lab-canvas" aria-label="Interactive vector field visualization"></canvas>
-          <p class="lab-caption">Pointer-driven force field. Particles obey attraction, damping, and boundary constraints.</p>
-        </article>
+          <span class="engine-toggle-action mono">
+            <span class="engine-toggle-label">Deploy</span>
+            <span class="engine-toggle-icon" aria-hidden="true">+</span>
+          </span>
+        </button>
 
-        <!-- Module: Geometry -->
-        <article class="lab-card reveal">
-          <div class="lab-header">
-            <span class="mono">MOD · 02</span>
-            <span class="lab-title">Solid Geometry</span>
-            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+        <div class="engine-bay" id="engineBay" hidden>
+          <div class="engine-tabs" role="tablist" aria-label="Engine modules">
+            <button type="button" class="engine-tab is-active" role="tab" id="tab-vectors" aria-selected="true" aria-controls="panel-vectors" data-tab="vectors">
+              <span class="mono">01</span>
+              <span>Vector</span>
+            </button>
+            <button type="button" class="engine-tab" role="tab" id="tab-wireframe" aria-selected="false" aria-controls="panel-wireframe" data-tab="wireframe" tabindex="-1">
+              <span class="mono">02</span>
+              <span>Geometry</span>
+            </button>
+            <button type="button" class="engine-tab" role="tab" id="tab-lattice" aria-selected="false" aria-controls="panel-lattice" data-tab="lattice" tabindex="-1">
+              <span class="mono">03</span>
+              <span>Lattice</span>
+            </button>
+            <button type="button" class="engine-tab" role="tab" id="tab-dna" aria-selected="false" aria-controls="panel-dna" data-tab="dna" tabindex="-1">
+              <span class="mono">04</span>
+              <span>DNA</span>
+            </button>
+            <button type="button" class="engine-tab" role="tab" id="tab-chrono" aria-selected="false" aria-controls="panel-chrono" data-tab="chrono" tabindex="-1">
+              <span class="mono">05</span>
+              <span>Chrono</span>
+            </button>
           </div>
-          <canvas id="wireframe" class="lab-canvas" aria-label="Rotating 3D polyhedron"></canvas>
-          <p class="lab-caption">Perspective-projected polyhedron with depth-sorted faces. Pure math, no libraries.</p>
-        </article>
 
-        <!-- Module: 3D lattice -->
-        <article class="lab-card reveal">
-          <div class="lab-header">
-            <span class="mono">MOD · 02B</span>
-            <span class="lab-title">3D Lattice</span>
-            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
-          </div>
-          <canvas id="lattice" class="lab-canvas" aria-label="Interactive 3D point lattice"></canvas>
-          <p class="lab-caption">3D point cloud with perspective projection. Drag or move to reorient the lattice.</p>
-        </article>
-
-        <!-- Module: DNA helix -->
-        <article class="lab-card lab-card--wide reveal">
-          <div class="lab-header">
-            <span class="mono">MOD · 03</span>
-            <span class="lab-title">DNA Structure</span>
-            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
-          </div>
-          <canvas id="dna" class="lab-canvas" aria-label="Interactive 3D DNA double helix"></canvas>
-          <p class="lab-caption">Double helix with base-pair rungs. Drag or touch to reorient — pure 3D projection, no libraries.</p>
-        </article>
-
-        <!-- Module: Chronograph -->
-        <article class="lab-card lab-card--wide reveal">
-          <div class="lab-header">
-            <span class="mono">MOD · 04</span>
-            <span class="lab-title">Precision Chronograph</span>
-            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
-          </div>
-          <div class="chrono" id="chrono">
-            <div class="chrono-face">
-              <canvas id="clock" width="280" height="280" aria-label="Precision analog clock"></canvas>
+          <div class="engine-panels">
+            <div class="engine-panel is-active" role="tabpanel" id="panel-vectors" aria-labelledby="tab-vectors">
+              <article class="lab-card lab-card--panel">
+                <div class="lab-header">
+                  <span class="mono">MOD · 01</span>
+                  <span class="lab-title">Vector Field</span>
+                  <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+                </div>
+                <canvas id="vectors" class="lab-canvas" aria-label="Interactive vector field visualization"></canvas>
+                <p class="lab-caption">Pointer-driven force field. Particles obey attraction, damping, and boundary constraints.</p>
+              </article>
             </div>
-            <div class="chrono-readouts">
-              <div class="chrono-row">
-                <span class="mono label">UTC</span>
-                <span class="mono value" id="utcTime">--:--:--.---</span>
-              </div>
-              <div class="chrono-row">
-                <span class="mono label">FRAME Δ</span>
-                <span class="mono value" id="frameDelta">0.00 ms</span>
-              </div>
-              <div class="chrono-row">
-                <span class="mono label">SESSION</span>
-                <span class="mono value" id="sessionTime">00:00:00</span>
-              </div>
-              <div class="chrono-row">
-                <span class="mono label">RENDER</span>
-                <span class="mono value" id="renderPath">RAF · CANVAS 2D</span>
-              </div>
+
+            <div class="engine-panel" role="tabpanel" id="panel-wireframe" aria-labelledby="tab-wireframe" hidden>
+              <article class="lab-card lab-card--panel">
+                <div class="lab-header">
+                  <span class="mono">MOD · 02</span>
+                  <span class="lab-title">Solid Geometry</span>
+                  <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+                </div>
+                <canvas id="wireframe" class="lab-canvas" aria-label="Rotating 3D polyhedron"></canvas>
+                <p class="lab-caption">Drag to rotate. Perspective-projected polyhedron — pure math, no libraries.</p>
+              </article>
+            </div>
+
+            <div class="engine-panel" role="tabpanel" id="panel-lattice" aria-labelledby="tab-lattice" hidden>
+              <article class="lab-card lab-card--panel">
+                <div class="lab-header">
+                  <span class="mono">MOD · 03</span>
+                  <span class="lab-title">3D Lattice</span>
+                  <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+                </div>
+                <canvas id="lattice" class="lab-canvas" aria-label="Interactive 3D point lattice"></canvas>
+                <p class="lab-caption">Drag to reorient. 3D point cloud with perspective projection.</p>
+              </article>
+            </div>
+
+            <div class="engine-panel" role="tabpanel" id="panel-dna" aria-labelledby="tab-dna" hidden>
+              <article class="lab-card lab-card--panel">
+                <div class="lab-header">
+                  <span class="mono">MOD · 04</span>
+                  <span class="lab-title">DNA Structure</span>
+                  <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+                </div>
+                <canvas id="dna" class="lab-canvas" aria-label="Interactive 3D DNA double helix"></canvas>
+                <p class="lab-caption">Drag to reorient. Double helix with base-pair rungs — pure 3D projection.</p>
+              </article>
+            </div>
+
+            <div class="engine-panel" role="tabpanel" id="panel-chrono" aria-labelledby="tab-chrono" hidden>
+              <article class="lab-card lab-card--panel">
+                <div class="lab-header">
+                  <span class="mono">MOD · 05</span>
+                  <span class="lab-title">Precision Chronograph</span>
+                  <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+                </div>
+                <div class="chrono" id="chrono">
+                  <div class="chrono-face">
+                    <canvas id="clock" width="280" height="280" aria-label="Precision analog clock"></canvas>
+                  </div>
+                  <div class="chrono-readouts">
+                    <div class="chrono-row">
+                      <span class="mono label">UTC</span>
+                      <span class="mono value" id="utcTime">--:--:--.---</span>
+                    </div>
+                    <div class="chrono-row">
+                      <span class="mono label">FRAME Δ</span>
+                      <span class="mono value" id="frameDelta">0.00 ms</span>
+                    </div>
+                    <div class="chrono-row">
+                      <span class="mono label">SESSION</span>
+                      <span class="mono value" id="sessionTime">00:00:00</span>
+                    </div>
+                    <div class="chrono-row">
+                      <span class="mono label">RENDER</span>
+                      <span class="mono value" id="renderPath">RAF · CANVAS 2D</span>
+                    </div>
+                  </div>
+                </div>
+                <p class="lab-caption">Sub-frame timing. What you see is what we optimize for — every millisecond of presence.</p>
+              </article>
             </div>
           </div>
-          <p class="lab-caption">Sub-frame timing. What you see is what we optimize for — every millisecond of presence.</p>
-        </article>
+        </div>
       </div>
 
       <div class="engine-manifesto reveal">

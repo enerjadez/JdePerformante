@@ -528,18 +528,14 @@
     let frames = 0,
       fpsT = 0;
 
-    // Influence is OFF unless mouse is hovering OR finger is in "play" mode
+    // Mouse hover OR finger-down tracking (fluid). Scroll cancels touch.
     const ptr = {
       x: 0,
       y: 0,
-      active: false, // drives physics + red accent
-      // touch session state
+      active: false,
       down: false,
       id: null,
-      startX: 0,
-      startY: 0,
       startScroll: 0,
-      playing: false, // true once we know it's a field drag, not a page scroll
       cancelled: false,
     };
 
@@ -612,11 +608,23 @@
       }
     };
 
-    // ── Mouse = classic desktop hover ─────────────────────
+    // ── Mouse = hover tracking ────────────────────────────
     hero.addEventListener(
       "pointermove",
       (e) => {
-        if (e.pointerType !== "mouse") return;
+        if (e.pointerType === "mouse") {
+          setActiveAt(e.clientX, e.clientY, true);
+          return;
+        }
+        // Touch: fluid follow while finger is down (no hold gate)
+        if (!ptr.down || ptr.cancelled) return;
+        if (ptr.id != null && e.pointerId !== ptr.id) return;
+        const scrollNow = window.scrollY || window.pageYOffset || 0;
+        if (Math.abs(scrollNow - ptr.startScroll) > 8) {
+          ptr.cancelled = true;
+          ptr.active = false;
+          return;
+        }
         setActiveAt(e.clientX, e.clientY, true);
       },
       { passive: true }
@@ -629,84 +637,17 @@
       { passive: true }
     );
 
-    // ── Touch / pen: ONLY engage if NOT scrolling the page ─
-    // This was the mobile "auto clump" bug: every scroll-touch
-    // pulled the whole field to the finger.
+    // ── Touch: immediate + fluid with the finger ──────────
     hero.addEventListener(
       "pointerdown",
       (e) => {
         if (e.pointerType === "mouse") return;
         ptr.down = true;
         ptr.id = e.pointerId;
-        ptr.startX = e.clientX;
-        ptr.startY = e.clientY;
         ptr.startScroll = window.scrollY || window.pageYOffset || 0;
-        ptr.playing = false;
         ptr.cancelled = false;
-        ptr.active = false; // stay idle until we know it's a field gesture
-      },
-      { passive: true }
-    );
-
-    hero.addEventListener(
-      "pointermove",
-      (e) => {
-        if (e.pointerType === "mouse") return;
-        if (!ptr.down || e.pointerId !== ptr.id || ptr.cancelled) return;
-
-        const scrollNow = window.scrollY || window.pageYOffset || 0;
-        const scrolled = Math.abs(scrollNow - ptr.startScroll) > 6;
-        const dx = e.clientX - ptr.startX;
-        const dy = e.clientY - ptr.startY;
-        const moved = Math.hypot(dx, dy);
-
-        // Page is scrolling → kill influence immediately (let them scroll)
-        if (scrolled) {
-          ptr.cancelled = true;
-          ptr.playing = false;
-          ptr.active = false;
-          return;
-        }
-
-        // Mostly vertical finger move without scroll yet → treat as scroll intent
-        if (!ptr.playing && moved > 10 && Math.abs(dy) > Math.abs(dx) * 1.4) {
-          ptr.cancelled = true;
-          ptr.active = false;
-          return;
-        }
-
-        // Horizontal-ish drag, or a held press with small movement → play field
-        if (!ptr.playing && moved > 8) {
-          ptr.playing = true;
-        }
-        // Long press in place (no scroll) also plays
-        if (!ptr.playing && moved < 8) {
-          // activate after brief hold via timestamp check in frame — arm on move anyway for small moves after 120ms
-        }
-
-        if (ptr.playing) {
-          setActiveAt(e.clientX, e.clientY, true);
-        }
-      },
-      { passive: true }
-    );
-
-    // Hold-in-place arming (tap-hold without scroll = interact)
-    let holdTimer = 0;
-    hero.addEventListener(
-      "pointerdown",
-      (e) => {
-        if (e.pointerType === "mouse") return;
-        clearTimeout(holdTimer);
-        holdTimer = setTimeout(() => {
-          if (ptr.down && !ptr.cancelled && !ptr.playing) {
-            const scrollNow = window.scrollY || window.pageYOffset || 0;
-            if (Math.abs(scrollNow - ptr.startScroll) <= 6) {
-              ptr.playing = true;
-              setActiveAt(ptr.startX, ptr.startY, true);
-            }
-          }
-        }, 140);
+        // Engage immediately — no press-and-hold delay
+        setActiveAt(e.clientX, e.clientY, true);
       },
       { passive: true }
     );
@@ -714,23 +655,20 @@
     const endPointer = (e) => {
       if (e.pointerType === "mouse") return;
       if (ptr.id != null && e.pointerId !== ptr.id) return;
-      clearTimeout(holdTimer);
       ptr.down = false;
       ptr.id = null;
-      ptr.playing = false;
       ptr.cancelled = false;
       ptr.active = false;
     };
     hero.addEventListener("pointerup", endPointer, { passive: true });
     hero.addEventListener("pointercancel", endPointer, { passive: true });
 
-    // If user scrolls the page by any means while finger is down, kill influence
+    // Scrolling the page while touching → release field (don't fight scroll)
     window.addEventListener(
       "scroll",
       () => {
         if (ptr.down) {
           ptr.cancelled = true;
-          ptr.playing = false;
           ptr.active = false;
         }
       },
@@ -1622,9 +1560,84 @@
     );
   }
 
+  // ─── Engine bay: collapse + tabs ─────────────────────────
+  function initEngineBay() {
+    const toggle = document.getElementById("engineToggle");
+    const bay = document.getElementById("engineBay");
+    if (!toggle || !bay) return;
+
+    const titleEl = toggle.querySelector(".engine-toggle-title");
+    const countEl = toggle.querySelector(".engine-toggle-count");
+    const labelEl = toggle.querySelector(".engine-toggle-label");
+    const tabs = Array.from(bay.querySelectorAll(".engine-tab"));
+    const panels = Array.from(bay.querySelectorAll(".engine-panel"));
+
+    const setOpen = (open) => {
+      toggle.setAttribute("aria-expanded", String(open));
+      bay.hidden = !open;
+      if (titleEl) titleEl.textContent = open ? "Modules online" : "Modules offline";
+      if (countEl) {
+        countEl.textContent = open ? "05 SYSTEMS · DEPLOYED" : "05 SYSTEMS · COLLAPSED";
+      }
+      if (labelEl) labelEl.textContent = open ? "Collapse" : "Deploy";
+      if (open) {
+        // Force canvas resize after layout
+        requestAnimationFrame(() => {
+          window.dispatchEvent(new Event("resize"));
+        });
+      }
+    };
+
+    toggle.addEventListener("click", () => {
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      setOpen(open);
+    });
+
+    const activateTab = (id) => {
+      tabs.forEach((tab) => {
+        const on = tab.dataset.tab === id;
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-selected", String(on));
+        tab.tabIndex = on ? 0 : -1;
+      });
+      panels.forEach((panel) => {
+        const on = panel.id === "panel-" + id;
+        panel.classList.toggle("is-active", on);
+        panel.hidden = !on;
+      });
+      // Resize active canvases after tab switch
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+    };
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => activateTab(tab.dataset.tab));
+      tab.addEventListener("keydown", (e) => {
+        const i = tabs.indexOf(tab);
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          const next = tabs[(i + 1) % tabs.length];
+          next.focus();
+          activateTab(next.dataset.tab);
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          const prev = tabs[(i - 1 + tabs.length) % tabs.length];
+          prev.focus();
+          activateTab(prev.dataset.tab);
+        }
+      });
+    });
+
+    // Closed by default
+    setOpen(false);
+    activateTab("vectors");
+  }
+
   // ─── Start ──────────────────────────────────────────────
   initTitleRotator();
   initScene3d();
+  initEngineBay();
 
   runBoot().then(() => {
     initHeroField();

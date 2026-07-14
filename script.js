@@ -380,23 +380,24 @@
   });
 
   // ═══════════════════════════════════════════════════════
-  // HERO field — uncapped FPS, dense mesh on mobile + desktop
+  // HERO field — same physics desktop + mobile (touch = mouse)
   // ═══════════════════════════════════════════════════════
   function initHeroField() {
     const canvas = document.getElementById("field");
     if (!canvas) return;
-    // desynchronized removed — can blank/freeze canvas on some desktop GPUs
     const ctx = canvas.getContext("2d", { alpha: true });
     const hudCoords = document.getElementById("hudCoords");
     const hudFps = document.getElementById("hudFps");
     const hudNodes = document.getElementById("hudNodes");
     const hero = canvas.parentElement;
+    if (!hero) return;
 
     let w = 0,
       h = 0,
       dpr = 1,
       nodes = [];
-    let pointer = { x: 0, y: 0, active: false };
+    // Pointer: mouse hover OR finger down — identical influence
+    const pointer = { x: 0, y: 0, active: false, touch: false };
     let frames = 0,
       fpsT = 0;
 
@@ -405,92 +406,132 @@
       let y = Math.random() * h;
       if (edge === "right") x = w + 8;
       if (edge === "left") x = -8;
-      // Mobile: slightly slower drift so neighbors stay linkable longer
-      const speed = isMobile ? 0.28 : 0.42;
       return {
         x,
         y,
-        vx: (Math.random() - 0.5) * speed,
-        vy: (Math.random() - 0.5) * speed,
-        r: Math.random() * (isMobile ? 1.8 : 1.5) + (isMobile ? 0.7 : 0.5),
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        r: Math.random() * 1.5 + 0.55,
         pulse: Math.random() * Math.PI * 2,
       };
     };
 
     const resize = () => {
       dpr = maxDpr;
-      // Size from hero section — canvas is position:absolute and may report 0 early
-      w = (hero && hero.clientWidth) || canvas.clientWidth || window.innerWidth;
-      h = (hero && hero.clientHeight) || canvas.clientHeight || window.innerHeight;
+      w = Math.round(hero.clientWidth || window.innerWidth);
+      h = Math.round(hero.clientHeight || window.innerHeight);
       if (w < 2 || h < 2) {
         w = window.innerWidth;
         h = window.innerHeight;
       }
-      canvas.width = (w * dpr) | 0;
-      canvas.height = (h * dpr) | 0;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
       canvas.style.width = w + "px";
       canvas.style.height = h + "px";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // Dense field on both — mobile uses long-range links instead of skipping pairs
-      const density = isMobile ? 4800 : 2800;
-      const minN = isMobile ? 110 : 180;
-      const maxN = isMobile ? 200 : 360;
+
+      const density = isMobile ? 4200 : 2800;
+      const minN = isMobile ? 100 : 180;
+      const maxN = isMobile ? 180 : 340;
       const count = Math.max(minN, Math.min(maxN, ((w * h) / density) | 0));
-      nodes = Array.from({ length: count }, () => spawn());
+      // Keep positions if count similar; full respawn on big change
+      if (Math.abs(nodes.length - count) > 20 || !nodes.length) {
+        nodes = Array.from({ length: count }, () => spawn());
+      }
       if (hudNodes) hudNodes.textContent = `NODES ${nodes.length}`;
     };
     onResize(resize);
     resize();
-    // Second layout pass after fonts/boot
     requestAnimationFrame(() => requestAnimationFrame(resize));
 
-    if (isFine) {
-      hero?.addEventListener(
-        "mousemove",
-        (e) => {
-          const rect = canvas.getBoundingClientRect();
-          pointer.x = e.clientX - rect.left;
-          pointer.y = e.clientY - rect.top;
-          pointer.active = true;
-          if (hudCoords) {
-            hudCoords.textContent = `X ${((pointer.x / w) * 2 - 1).toFixed(3)} · Y ${((pointer.y / h) * 2 - 1).toFixed(3)}`;
-          }
-        },
-        { passive: true }
-      );
-      hero?.addEventListener("mouseleave", () => (pointer.active = false), { passive: true });
-    }
-    // Continuous touch influence while finger is down
-    hero?.addEventListener(
+    // Map client coords → canvas field space
+    const track = (clientX, clientY, active) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = w / Math.max(1, rect.width);
+      const scaleY = h / Math.max(1, rect.height);
+      pointer.x = (clientX - rect.left) * scaleX;
+      pointer.y = (clientY - rect.top) * scaleY;
+      pointer.active = active;
+      if (hudCoords && pointer.active) {
+        hudCoords.textContent = `X ${((pointer.x / w) * 2 - 1).toFixed(3)} · Y ${((pointer.y / h) * 2 - 1).toFixed(3)}`;
+      }
+    };
+
+    // Unified pointer events (mouse + touch + pen) — same behaviour everywhere
+    hero.addEventListener(
+      "pointermove",
+      (e) => {
+        if (e.pointerType === "mouse") {
+          track(e.clientX, e.clientY, true);
+        } else if (pointer.touch) {
+          // Finger dragged — follow exactly like mouse
+          track(e.clientX, e.clientY, true);
+        }
+      },
+      { passive: true }
+    );
+
+    hero.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        if (e.pointerType !== "mouse") {
+          pointer.touch = true;
+          try {
+            hero.setPointerCapture(e.pointerId);
+          } catch (_) {}
+        }
+        track(e.clientX, e.clientY, true);
+      },
+      { passive: true }
+    );
+
+    const endTouch = (e) => {
+      if (e.pointerType === "mouse") return;
+      pointer.touch = false;
+      pointer.active = false;
+      try {
+        hero.releasePointerCapture?.(e.pointerId);
+      } catch (_) {}
+    };
+    hero.addEventListener("pointerup", endTouch, { passive: true });
+    hero.addEventListener("pointercancel", endTouch, { passive: true });
+
+    hero.addEventListener(
+      "pointerleave",
+      (e) => {
+        // Mouse leaves hero → release influence; touch handled by up/cancel
+        if (e.pointerType === "mouse") pointer.active = false;
+      },
+      { passive: true }
+    );
+
+    // Fallback for older mobile browsers without good pointer events
+    hero.addEventListener(
       "touchstart",
       (e) => {
         const t = e.touches[0];
         if (!t) return;
-        const rect = canvas.getBoundingClientRect();
-        pointer.x = t.clientX - rect.left;
-        pointer.y = t.clientY - rect.top;
-        pointer.active = true;
+        pointer.touch = true;
+        track(t.clientX, t.clientY, true);
       },
       { passive: true }
     );
-    hero?.addEventListener(
+    hero.addEventListener(
       "touchmove",
       (e) => {
         const t = e.touches[0];
-        if (!t || !pointer.active) return;
-        const rect = canvas.getBoundingClientRect();
-        pointer.x = t.clientX - rect.left;
-        pointer.y = t.clientY - rect.top;
+        if (!t || !pointer.touch) return;
+        track(t.clientX, t.clientY, true);
       },
       { passive: true }
     );
-    hero?.addEventListener(
-      "touchend",
-      () => {
-        pointer.active = false;
-      },
-      { passive: true }
-    );
+    const touchEnd = () => {
+      pointer.touch = false;
+      pointer.active = false;
+    };
+    hero.addEventListener("touchend", touchEnd, { passive: true });
+    hero.addEventListener("touchcancel", touchEnd, { passive: true });
 
     createRunner(
       canvas,
@@ -509,17 +550,29 @@
 
         ctx.clearRect(0, 0, w, h);
 
+        const attractR = 190;
+        const linkDist = Math.max(110, Math.min(w, h) * 0.14);
+        const redLinkR = 170; // distance from pointer for red accent links
+        const nLen = nodes.length;
+
+        // Soft glow under finger / cursor
         if (pointer.active) {
-          const g = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, isMobile ? 200 : 160);
-          g.addColorStop(0, "rgba(225,6,0,0.12)");
+          const g = ctx.createRadialGradient(
+            pointer.x,
+            pointer.y,
+            0,
+            pointer.x,
+            pointer.y,
+            200
+          );
+          g.addColorStop(0, "rgba(225,6,0,0.14)");
+          g.addColorStop(0.45, "rgba(225,6,0,0.05)");
           g.addColorStop(1, "transparent");
           ctx.fillStyle = g;
           ctx.fillRect(0, 0, w, h);
         }
 
-        const nLen = nodes.length;
-        const attractR = isMobile ? 200 : 170;
-
+        // Physics — no center pull, no inter-node springs (those caused mobile clumping)
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
           if (pointer.active) {
@@ -527,42 +580,30 @@
             const dy = pointer.y - n.y;
             const dist = Math.hypot(dx, dy) || 1;
             if (dist < attractR) {
-              const f = (1 - dist / attractR) * (isMobile ? 0.12 : 0.09);
+              const f = (1 - dist / attractR) * 0.1;
               n.vx += (dx / dist) * f * dt;
               n.vy += (dy / dist) * f * dt;
             }
           }
-          // Soft center drift on mobile keeps density in the mesh zone
-          if (isMobile) {
-            n.vx += (w * 0.5 - n.x) * 0.00008 * dt;
-            n.vy += (h * 0.45 - n.y) * 0.00008 * dt;
-          }
           n.vx *= 0.99;
           n.vy *= 0.99;
-          n.x += n.vx * dt * 1.2;
-          n.y += n.vy * dt * 1.2;
+          n.x += n.vx * dt * 1.25;
+          n.y += n.vy * dt * 1.25;
           n.pulse += 0.035 * dt;
-          // Soft wrap instead of despawn — denser continuous field
-          if (n.x < -10) n.x = w + 10;
-          else if (n.x > w + 10) n.x = -10;
-          if (n.y < -10) n.y = h + 10;
-          else if (n.y > h + 10) n.y = -10;
+
+          // Respawn at edge when far out (same as classic desktop feel)
+          if (n.x < -20 || n.x > w + 20 || n.y < -20 || n.y > h + 20) {
+            Object.assign(n, spawn(Math.random() > 0.5 ? "left" : "right"));
+          }
         }
 
-        // Link range: mobile gets LONG reach so the web looks full
-        const linkDist = isMobile
-          ? Math.max(150, Math.min(w, h) * 0.32)
-          : Math.max(120, Math.min(w, h) * 0.15);
-        const lim = linkDist * linkDist;
-        // Spatial hash — full neighbor links without O(n²) freeze
+        // Spatial hash for links
         const cell = linkDist;
         const grid = new Map();
         const key = (cx, cy) => cx + "," + cy;
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
-          const cx = (n.x / cell) | 0;
-          const cy = (n.y / cell) | 0;
-          const k = key(cx, cy);
+          const k = key((n.x / cell) | 0, (n.y / cell) | 0);
           let bucket = grid.get(k);
           if (!bucket) {
             bucket = [];
@@ -571,18 +612,17 @@
           bucket.push(i);
         }
 
-        const lineBoost = isMobile ? 0.72 : 0.55;
-        const alphaBoost = isMobile ? 0.5 : 0.34;
-        ctx.lineWidth = isMobile ? 0.85 : 0.65;
+        const lim = linkDist * linkDist;
+        const redLim = redLinkR * redLinkR;
         ctx.lineCap = "round";
 
         for (let i = 0; i < nLen; i++) {
           const a = nodes[i];
-          const cx = (a.x / cell) | 0;
-          const cy = (a.y / cell) | 0;
+          const cxi = (a.x / cell) | 0;
+          const cyi = (a.y / cell) | 0;
           for (let ox = -1; ox <= 1; ox++) {
             for (let oy = -1; oy <= 1; oy++) {
-              const bucket = grid.get(key(cx + ox, cy + oy));
+              const bucket = grid.get(key(cxi + ox, cyi + oy));
               if (!bucket) continue;
               for (let bi = 0; bi < bucket.length; bi++) {
                 const j = bucket[bi];
@@ -593,34 +633,73 @@
                 const d2 = dx * dx + dy * dy;
                 if (d2 >= lim || d2 < 0.5) continue;
                 const d = Math.sqrt(d2);
-                const alpha = (1 - d / linkDist) * alphaBoost;
-                // Mild spring so nearby nodes stay linked on mobile
-                if (isMobile && d > linkDist * 0.35) {
-                  const pull = 0.00035 * (d - linkDist * 0.35) * dt;
-                  const inv = 1 / d;
-                  a.vx -= dx * inv * pull;
-                  a.vy -= dy * inv * pull;
-                  b.vx += dx * inv * pull;
-                  b.vy += dy * inv * pull;
+                const alpha = (1 - d / linkDist) * 0.38;
+
+                // Red accent when either endpoint (or mid) is near pointer — desktop look
+                let hot = false;
+                if (pointer.active) {
+                  const mx = (a.x + b.x) * 0.5;
+                  const my = (a.y + b.y) * 0.5;
+                  const dMid =
+                    (mx - pointer.x) * (mx - pointer.x) +
+                    (my - pointer.y) * (my - pointer.y);
+                  const dA =
+                    (a.x - pointer.x) * (a.x - pointer.x) +
+                    (a.y - pointer.y) * (a.y - pointer.y);
+                  const dB =
+                    (b.x - pointer.x) * (b.x - pointer.x) +
+                    (b.y - pointer.y) * (b.y - pointer.y);
+                  hot = dMid < redLim || dA < redLim * 0.7 || dB < redLim * 0.7;
                 }
-                ctx.strokeStyle = `rgba(255,255,255,${alpha * lineBoost})`;
+
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
+                if (hot) {
+                  ctx.strokeStyle = `rgba(225,6,0,${Math.min(0.95, alpha * 2.2)})`;
+                  ctx.lineWidth = 1.15;
+                } else {
+                  ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.55})`;
+                  ctx.lineWidth = 0.65;
+                }
                 ctx.stroke();
               }
             }
           }
         }
 
+        // Nodes
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
-          const glow = 0.5 + Math.sin(n.pulse) * 0.25;
-          const near = pointer.active && Math.hypot(n.x - pointer.x, n.y - pointer.y) < 90;
+          const glow = 0.48 + Math.sin(n.pulse) * 0.22;
+          const near =
+            pointer.active && Math.hypot(n.x - pointer.x, n.y - pointer.y) < 100;
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.r * (near ? 1.6 : 1), 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, n.r * (near ? 1.85 : 1), 0, Math.PI * 2);
           ctx.fillStyle = near ? `rgba(225,6,0,${glow})` : `${WHITE}${glow})`;
           ctx.fill();
+          if (near) {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, n.r * 3.2, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(225,6,0,0.12)";
+            ctx.fill();
+          }
+        }
+
+        // Crosshair at pointer (desktop + mobile)
+        if (pointer.active) {
+          ctx.strokeStyle = "rgba(225,6,0,0.55)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(pointer.x - 14, pointer.y);
+          ctx.lineTo(pointer.x + 14, pointer.y);
+          ctx.moveTo(pointer.x, pointer.y - 14);
+          ctx.lineTo(pointer.x, pointer.y + 14);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(pointer.x, pointer.y, 24, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(225,6,0,0.28)";
+          ctx.stroke();
         }
       },
       0,

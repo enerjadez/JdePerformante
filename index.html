@@ -146,19 +146,56 @@
     <!-- SIGNAL STRIP -->
     <section class="signal" aria-label="Live signal">
       <canvas id="scope" class="scope-canvas" height="80" aria-hidden="true"></canvas>
-      <div class="signal-bar">
+      <div class="signal-console">
         <div class="signal-meta">
           <span class="mono">LIVE WAVEFORM</span>
-          <span class="mono" id="scopeHz">440.0 Hz</span>
-          <span class="mono" id="scopeModeLabel">SINE · 440</span>
+          <span class="mono" id="scopeModeLabel">SINE · OSC</span>
         </div>
-        <div class="wave-controls" role="group" aria-label="Waveform mode">
-          <button type="button" class="wave-btn is-active" data-wave="sine" data-hz="220">220 Hz</button>
-          <button type="button" class="wave-btn" data-wave="sine" data-hz="440">440 Hz</button>
-          <button type="button" class="wave-btn" data-wave="sine" data-hz="880">880 Hz</button>
-          <button type="button" class="wave-btn" data-wave="sine" data-hz="1760">1.7k</button>
-          <button type="button" class="wave-btn" data-wave="heartbeat" data-hz="72">♥ Heart</button>
-          <button type="button" class="wave-btn" data-wave="pulse" data-hz="120">Pulse</button>
+
+        <div class="wave-modes" role="tablist" aria-label="Waveform type">
+          <button type="button" class="wave-mode is-active" role="tab" aria-selected="true" data-wave="sine" title="Sine wave">
+            <svg class="wave-mode-icon" viewBox="0 0 40 24" aria-hidden="true">
+              <path d="M1 12 C6 12 6 4 11 4 S16 20 21 20 S26 4 31 4 S36 12 39 12" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+            </svg>
+            <span class="mono">WAVE</span>
+          </button>
+          <button type="button" class="wave-mode" role="tab" aria-selected="false" data-wave="heartbeat" title="Heartbeat">
+            <svg class="wave-mode-icon" viewBox="0 0 40 24" aria-hidden="true">
+              <path d="M1 14 H8 L11 8 L15 20 L19 4 L23 14 H39" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="mono">HEART</span>
+          </button>
+          <button type="button" class="wave-mode" role="tab" aria-selected="false" data-wave="pulse" title="Pulse train">
+            <svg class="wave-mode-icon" viewBox="0 0 40 24" aria-hidden="true">
+              <path d="M1 18 H8 V6 H14 V18 H20 V6 H26 V18 H32 V6 H38" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="mono">PULSE</span>
+          </button>
+        </div>
+
+        <div class="wave-dial-block">
+          <div
+            class="wave-dial"
+            id="waveDial"
+            role="slider"
+            aria-valuemin="80"
+            aria-valuemax="2000"
+            aria-valuenow="440"
+            aria-label="Frequency dial"
+            tabindex="0"
+          >
+            <div class="dial-ring" aria-hidden="true"></div>
+            <div class="dial-arc" aria-hidden="true"></div>
+            <div class="dial-ticks" aria-hidden="true" id="dialTicks"></div>
+            <div class="dial-needle" id="dialNeedle" aria-hidden="true"></div>
+            <div class="dial-hub" aria-hidden="true"></div>
+            <div class="dial-readout">
+              <span class="dial-value" id="scopeHz">440</span>
+              <span class="dial-unit mono" id="scopeUnit">Hz</span>
+            </div>
+            <div class="dial-label mono" aria-hidden="true">FREQ</div>
+          </div>
+          <p class="dial-hint mono">DRAG DIAL · RPM STYLE</p>
         </div>
       </div>
     </section>

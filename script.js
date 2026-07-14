@@ -878,14 +878,24 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  // Oscilloscope + wave mode buttons
+  // Oscilloscope + icon modes + RPM frequency dial
   // ═══════════════════════════════════════════════════════
   function initScope() {
     const canvas = document.getElementById("scope");
     const hzEl = document.getElementById("scopeHz");
+    const unitEl = document.getElementById("scopeUnit");
     const modeLabel = document.getElementById("scopeModeLabel");
+    const dial = document.getElementById("waveDial");
+    const needle = document.getElementById("dialNeedle");
+    const ticksEl = document.getElementById("dialTicks");
     if (!canvas) return;
     const ctx = canvas.getContext("2d", { alpha: false });
+
+    const RANGES = {
+      sine: { min: 80, max: 2000, def: 440, unit: "Hz", label: "SINE · OSC" },
+      heartbeat: { min: 40, max: 180, def: 72, unit: "BPM", label: "ECG · HEART" },
+      pulse: { min: 40, max: 200, def: 120, unit: "PPM", label: "PULSE TRAIN" },
+    };
 
     let w = 0,
       h = 80,
@@ -896,30 +906,149 @@
     let targetHz = 440;
     let displayHz = 440;
 
-    const setMode = (mode, hz) => {
-      waveMode = mode;
-      targetHz = hz;
-      document.querySelectorAll(".wave-btn").forEach((btn) => {
-        const active =
-          btn.dataset.wave === mode && String(btn.dataset.hz) === String(hz);
-        btn.classList.toggle("is-active", active);
-      });
-      if (modeLabel) {
-        if (mode === "heartbeat") modeLabel.textContent = "ECG · HEARTBEAT";
-        else if (mode === "pulse") modeLabel.textContent = "PULSE TRAIN";
-        else modeLabel.textContent = `SINE · ${hz}`;
+    // ── Build dial tick marks (RPM style, 240° sweep) ─────
+    if (ticksEl) {
+      ticksEl.innerHTML = "";
+      const tickCount = 24; // across 240°
+      for (let i = 0; i <= tickCount; i++) {
+        const t = i / tickCount;
+        // Sweep starts at 150° from top in CSS conic; ticks from -120° to +120°
+        const angle = -120 + t * 240;
+        const tick = document.createElement("span");
+        tick.className = "dial-tick" + (i % 4 === 0 ? " is-major" : "");
+        if (t > 0.75) tick.classList.add("is-hot");
+        // Position from center: rotate then offset
+        tick.style.transform = `rotate(${angle}deg) translateY(-48px)`;
+        ticksEl.appendChild(tick);
       }
+    }
+
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    const progressOf = (value) => {
+      const r = RANGES[waveMode];
+      return clamp((value - r.min) / (r.max - r.min), 0, 1);
     };
 
-    document.querySelectorAll(".wave-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        setMode(btn.dataset.wave || "sine", parseFloat(btn.dataset.hz) || 440);
+    // Map value → needle angle (-120° empty … +120° redline)
+    const angleOf = (value) => -120 + progressOf(value) * 240;
+
+    const applyDialVisual = (value) => {
+      const r = RANGES[waveMode];
+      const p = progressOf(value);
+      const ang = angleOf(value);
+      if (dial) {
+        dial.style.setProperty("--dial-angle", ang + "deg");
+        dial.style.setProperty("--dial-progress", String(p));
+        dial.setAttribute("aria-valuemin", String(r.min));
+        dial.setAttribute("aria-valuemax", String(r.max));
+        dial.setAttribute("aria-valuenow", String(Math.round(value)));
+      }
+      if (needle) needle.style.setProperty("--dial-angle", ang + "deg");
+      if (hzEl) {
+        hzEl.textContent =
+          waveMode === "sine" ? String(Math.round(value)) : String(Math.round(value));
+      }
+      if (unitEl) unitEl.textContent = r.unit;
+      if (modeLabel) modeLabel.textContent = r.label;
+    };
+
+    const setValue = (value, snap) => {
+      const r = RANGES[waveMode];
+      let v = clamp(value, r.min, r.max);
+      if (snap) {
+        // Coarser steps for BPM/pulse, finer for Hz
+        const step = waveMode === "sine" ? 5 : 1;
+        v = Math.round(v / step) * step;
+      }
+      targetHz = v;
+      applyDialVisual(v);
+    };
+
+    const setMode = (mode) => {
+      waveMode = RANGES[mode] ? mode : "sine";
+      document.querySelectorAll(".wave-mode").forEach((btn) => {
+        const on = btn.dataset.wave === waveMode;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-selected", String(on));
       });
+      setValue(RANGES[waveMode].def, true);
+    };
+
+    document.querySelectorAll(".wave-mode").forEach((btn) => {
+      btn.addEventListener("click", () => setMode(btn.dataset.wave || "sine"));
     });
-    setMode("sine", 440);
+
+    // ── Dial drag (RPM gauge interaction) ─────────────────
+    if (dial) {
+      let dragging = false;
+
+      const valueFromEvent = (clientX, clientY) => {
+        const rect = dial.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        // Angle from center; 0 = up, positive CW
+        let ang = (Math.atan2(clientX - cx, cy - clientY) * 180) / Math.PI;
+        // Map usable sweep -120..120 (bottom of dial is dead zone)
+        ang = clamp(ang, -120, 120);
+        const t = (ang + 120) / 240;
+        const r = RANGES[waveMode];
+        return r.min + t * (r.max - r.min);
+      };
+
+      const onDown = (e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        dragging = true;
+        dial.classList.add("is-dragging");
+        try {
+          dial.setPointerCapture(e.pointerId);
+        } catch (_) {}
+        setValue(valueFromEvent(e.clientX, e.clientY), false);
+        if (e.cancelable) e.preventDefault();
+      };
+      const onMove = (e) => {
+        if (!dragging) return;
+        setValue(valueFromEvent(e.clientX, e.clientY), false);
+        if (e.cancelable) e.preventDefault();
+      };
+      const onUp = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        dial.classList.remove("is-dragging");
+        setValue(targetHz, true);
+        try {
+          dial.releasePointerCapture?.(e.pointerId);
+        } catch (_) {}
+      };
+
+      dial.addEventListener("pointerdown", onDown, { passive: false });
+      dial.addEventListener("pointermove", onMove, { passive: false });
+      dial.addEventListener("pointerup", onUp, { passive: true });
+      dial.addEventListener("pointercancel", onUp, { passive: true });
+
+      // Keyboard: arrows nudge frequency
+      dial.addEventListener("keydown", (e) => {
+        const r = RANGES[waveMode];
+        const step = waveMode === "sine" ? 20 : 2;
+        if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+          e.preventDefault();
+          setValue(targetHz + step, true);
+        } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+          e.preventDefault();
+          setValue(targetHz - step, true);
+        } else if (e.key === "Home") {
+          e.preventDefault();
+          setValue(r.min, true);
+        } else if (e.key === "End") {
+          e.preventDefault();
+          setValue(r.max, true);
+        }
+      });
+    }
+
+    setMode("sine");
 
     const resize = () => {
-      // Integer CSS size + integer buffer — kills subpixel shimmer
       const cssW = Math.max(
         1,
         Math.round(canvas.clientWidth || canvas.parentElement?.clientWidth || window.innerWidth)
@@ -973,19 +1102,14 @@
       canvas,
       (now) => {
         if (w < 2) resize();
-        // Clock-stable phase — no dt jitter shimmer
         const t = (now - t0) * 0.001;
-        displayHz += (targetHz - displayHz) * 0.1;
-        if (hzEl) {
-          if (waveMode === "heartbeat") hzEl.textContent = `${Math.round(displayHz)} BPM`;
-          else if (waveMode === "pulse") hzEl.textContent = `${Math.round(displayHz)} PPM`;
-          else hzEl.textContent = `${displayHz.toFixed(1)} Hz`;
-        }
+        displayHz += (targetHz - displayHz) * 0.12;
+        // Smooth needle chase
+        applyDialVisual(displayHz * 0.15 + targetHz * 0.85);
 
         ctx.fillStyle = "#070707";
         ctx.fillRect(0, 0, w, h);
 
-        // Pixel-aligned baseline
         const mid = Math.floor(h / 2) + 0.5;
         ctx.strokeStyle = "rgba(255,255,255,0.1)";
         ctx.lineWidth = 1;
@@ -994,11 +1118,9 @@
         ctx.lineTo(w, mid);
         ctx.stroke();
 
-        // Dense samples, no shadowBlur (shadow was the main glow glitch)
         const amp = h * 0.3;
-        const step = 1;
         ctx.beginPath();
-        for (let x = 0; x <= w; x += step) {
+        for (let x = 0; x <= w; x++) {
           const n = x / Math.max(1, w);
           const y = mid - sample(n, t, displayHz) * amp;
           if (x === 0) ctx.moveTo(x, y);

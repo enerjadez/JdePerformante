@@ -1,27 +1,27 @@
 # JDE Performante
 
-Elite portfolio showcase — precision design, performance engineering, and uncompromising interfaces.
+Engineering beauty into digital systems.  
+An awareness and contact site that *is* the showcase — live runtime systems, not a gallery of screenshots.
 
-**Live site:** [https://enerjadez.github.io/JdePerformante/](https://enerjadez.github.io/JdePerformante/)
+**Live:** [https://enerjadez.github.io/JdePerformante/](https://enerjadez.github.io/JdePerformante/)
 
-## Stack
+## What this is
 
-- Pure HTML / CSS / JavaScript
-- No build step — ready for GitHub Pages
-- Custom cursor, magnetic interactions, scroll reveals, count-up stats
+- Black / white / red design system
+- Animated hero: interactive particle field, HUD, kinetic type
+- Live engineering modules: vector field, wireframe solid, type machine, precision chronograph
+- Oscilloscope signal strip
+- Partners block (links to live work)
+- Contact-first close
 
-## Local preview
+No frameworks. Canvas 2D, RAF loops, pure CSS motion.
+
+## Local
 
 ```bash
-# any static server, e.g.
 npx serve .
-# or open index.html directly
 ```
 
 ## Deploy
 
-Hosted via **GitHub Pages** from the `main` branch root.
-
-## License
-
-© JDE Performante. All rights reserved.
+GitHub Pages · `main` · `/`

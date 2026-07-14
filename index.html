@@ -3,22 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="JDE Performante — Elite digital craft. Portfolio of precision design, performance engineering, and uncompromising interfaces." />
-  <meta name="theme-color" content="#050505" />
+  <meta name="description" content="JDE Performante — Engineering beauty into digital systems. We exist to build what shouldn't feel ordinary." />
+  <meta name="theme-color" content="#000000" />
   <meta property="og:title" content="JDE Performante" />
-  <meta property="og:description" content="Elite digital craft. Design & engineering portfolio." />
+  <meta property="og:description" content="Engineering beauty. Precision systems. Contact for collaborations." />
   <meta property="og:type" content="website" />
-  <title>JDE Performante — Elite Digital Craft</title>
+  <title>JDE Performante — Engineering Beauty</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23050505' width='100' height='100'/><text y='.9em' font-size='80' x='8' fill='%23e8ff47'>J</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23000' width='100' height='100'/><text y='.9em' font-size='80' x='8' fill='%23e10600'>J</text></svg>" />
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
   <div class="cursor" id="cursor" aria-hidden="true"></div>
-  <div class="cursor-trail" id="cursorTrail" aria-hidden="true"></div>
+  <div class="cursor-ring" id="cursorRing" aria-hidden="true"></div>
+
+  <!-- Boot sequence overlay -->
+  <div class="boot" id="boot" aria-hidden="true">
+    <div class="boot-inner">
+      <div class="boot-logo">JDE<span>/</span>PERFORMANTE</div>
+      <div class="boot-bar"><div class="boot-fill" id="bootFill"></div></div>
+      <div class="boot-status" id="bootStatus">INITIALIZING SYSTEMS</div>
+    </div>
+  </div>
 
   <header class="nav" id="nav">
     <a href="#top" class="nav-logo" data-magnetic>
@@ -26,9 +35,8 @@
       <span class="logo-sub">Performante</span>
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#work" data-magnetic>Work</a>
-      <a href="#about" data-magnetic>About</a>
-      <a href="#capabilities" data-magnetic>Capabilities</a>
+      <a href="#engine" data-magnetic>Engine</a>
+      <a href="#partners" data-magnetic>Partners</a>
       <a href="#contact" class="nav-cta" data-magnetic>Contact</a>
     </nav>
     <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
@@ -37,324 +45,287 @@
   </header>
 
   <div class="mobile-menu" id="mobileMenu" hidden>
-    <a href="#work">Work</a>
-    <a href="#about">About</a>
-    <a href="#capabilities">Capabilities</a>
+    <a href="#engine">Engine</a>
+    <a href="#partners">Partners</a>
     <a href="#contact">Contact</a>
   </div>
 
   <main id="top">
-    <!-- HERO -->
+    <!-- HERO: living engineering field -->
     <section class="hero">
-      <div class="hero-bg">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="grid-lines"></div>
+      <canvas id="field" class="hero-canvas" aria-hidden="true"></canvas>
+      <div class="hero-vignette" aria-hidden="true"></div>
+      <div class="hero-scan" aria-hidden="true"></div>
+
+      <div class="hero-hud" aria-hidden="true">
+        <div class="hud-corner tl"></div>
+        <div class="hud-corner tr"></div>
+        <div class="hud-corner bl"></div>
+        <div class="hud-corner br"></div>
+        <div class="hud-readout left">
+          <span id="hudCoords">X 0.000 · Y 0.000</span>
+          <span id="hudFps">60 FPS</span>
+        </div>
+        <div class="hud-readout right">
+          <span>SYS · ONLINE</span>
+          <span id="hudNodes">NODES 0</span>
+        </div>
       </div>
+
       <div class="hero-content">
-        <p class="eyebrow reveal">
+        <p class="eyebrow">
           <span class="pulse"></span>
-          Available for select collaborations
+          <span class="typewriter" id="typeStatus">SYSTEM ARMED</span>
         </p>
-        <h1 class="hero-title">
-          <span class="line reveal"><span class="line-inner">Precision.</span></span>
-          <span class="line reveal"><span class="line-inner italic">Performance.</span></span>
-          <span class="line reveal"><span class="line-inner">Presence.</span></span>
+        <h1 class="hero-title" id="heroTitle" aria-label="JDE Performante">
+          <span class="title-row">
+            <span class="char" data-char="J">J</span>
+            <span class="char" data-char="D">D</span>
+            <span class="char" data-char="E">E</span>
+          </span>
+          <span class="title-row title-row--serif">
+            <span class="word-slide" id="wordSlide">
+              <span>Performante</span>
+              <span>Engineered</span>
+              <span>Inevitable</span>
+              <span>Performante</span>
+            </span>
+          </span>
         </h1>
-        <p class="hero-lede reveal">
-          JDE Performante crafts digital experiences that move at the speed of ambition —
-          engineered interfaces, cinematic brands, and products built to dominate.
+        <p class="hero-lede">
+          We build digital systems where engineering is the art —
+          precision under pressure, beauty in the machine.
+          This page is the proof of concept.
         </p>
-        <div class="hero-actions reveal">
-          <a href="#work" class="btn btn-primary" data-magnetic>
-            <span>View selected work</span>
+        <div class="hero-actions">
+          <a href="#contact" class="btn btn-primary" data-magnetic>
+            <span>Initiate contact</span>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </a>
-          <a href="#contact" class="btn btn-ghost" data-magnetic>Start a project</a>
+          <a href="#engine" class="btn btn-ghost" data-magnetic>Inspect the engine</a>
         </div>
       </div>
-      <div class="hero-stats reveal">
-        <div class="stat">
-          <span class="stat-num" data-count="48">0</span>
-          <span class="stat-label">Projects shipped</span>
-        </div>
-        <div class="stat">
-          <span class="stat-num" data-count="12">0</span>
-          <span class="stat-label">Years crafting</span>
-        </div>
-        <div class="stat">
-          <span class="stat-num" data-count="100">0</span>
-          <span class="stat-label">% intentional</span>
-        </div>
+
+      <div class="hero-ticker" aria-hidden="true">
+        <div class="ticker-track" id="tickerTrack"></div>
       </div>
-      <a href="#work" class="scroll-hint" aria-label="Scroll to work">
-        <span>Scroll</span>
-        <div class="scroll-line"></div>
-      </a>
     </section>
 
-    <!-- MARQUEE -->
-    <div class="marquee" aria-hidden="true">
-      <div class="marquee-track">
-        <span>Interface Design</span><span class="dot">◆</span>
-        <span>Product Engineering</span><span class="dot">◆</span>
-        <span>Brand Systems</span><span class="dot">◆</span>
-        <span>Motion Design</span><span class="dot">◆</span>
-        <span>Web Performance</span><span class="dot">◆</span>
-        <span>Creative Direction</span><span class="dot">◆</span>
-        <span>Interface Design</span><span class="dot">◆</span>
-        <span>Product Engineering</span><span class="dot">◆</span>
-        <span>Brand Systems</span><span class="dot">◆</span>
-        <span>Motion Design</span><span class="dot">◆</span>
-        <span>Web Performance</span><span class="dot">◆</span>
-        <span>Creative Direction</span><span class="dot">◆</span>
+    <!-- SIGNAL STRIP -->
+    <section class="signal" aria-label="Live signal">
+      <canvas id="scope" class="scope-canvas" height="80" aria-hidden="true"></canvas>
+      <div class="signal-meta">
+        <span class="mono">LIVE WAVEFORM</span>
+        <span class="mono" id="scopeHz">440.0 Hz</span>
+        <span class="mono">AMPLITUDE · MODULATED</span>
       </div>
-    </div>
+    </section>
 
-    <!-- WORK -->
-    <section class="section work" id="work">
+    <!-- ENGINE: showcase of engineering craft -->
+    <section class="section engine" id="engine">
       <div class="section-head">
-        <p class="eyebrow reveal">Selected work</p>
-        <h2 class="section-title reveal">Case studies that<br /><em>set the pace</em></h2>
+        <p class="eyebrow reveal"><span class="red">01</span> — The engine</p>
+        <h2 class="section-title reveal">
+          Not a portfolio of screenshots.<br />
+          <em>A demonstration of craft.</em>
+        </h2>
+        <p class="section-lede reveal">
+          Move. Hover. Interact. Every system below is running in real time —
+          the same discipline we bring to products, brands, and platforms.
+        </p>
       </div>
 
-      <div class="work-grid">
-        <article class="work-card work-card--lg reveal" data-tilt>
-          <div class="work-visual" style="--accent: #e8ff47">
-            <div class="work-visual-inner">
-              <div class="mock-ui">
-                <div class="mock-bar"><span></span><span></span><span></span></div>
-                <div class="mock-body">
-                  <div class="mock-sidebar"></div>
-                  <div class="mock-main">
-                    <div class="mock-line w80"></div>
-                    <div class="mock-line w60"></div>
-                    <div class="mock-cards">
-                      <div class="mock-card"></div>
-                      <div class="mock-card"></div>
-                      <div class="mock-card"></div>
-                    </div>
-                  </div>
-                </div>
+      <div class="lab-grid">
+        <!-- Module: Vector field -->
+        <article class="lab-card lab-card--wide reveal">
+          <div class="lab-header">
+            <span class="mono">MOD · 01</span>
+            <span class="lab-title">Vector Field</span>
+            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+          </div>
+          <canvas id="vectors" class="lab-canvas" aria-label="Interactive vector field visualization"></canvas>
+          <p class="lab-caption">Pointer-driven force field. Particles obey attraction, damping, and boundary constraints.</p>
+        </article>
+
+        <!-- Module: Geometry -->
+        <article class="lab-card reveal">
+          <div class="lab-header">
+            <span class="mono">MOD · 02</span>
+            <span class="lab-title">Solid Geometry</span>
+            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+          </div>
+          <canvas id="wireframe" class="lab-canvas" aria-label="Rotating wireframe polyhedron"></canvas>
+          <p class="lab-caption">Perspective-projected polyhedron. Real rotation matrix, no libraries.</p>
+        </article>
+
+        <!-- Module: Type machine -->
+        <article class="lab-card reveal">
+          <div class="lab-header">
+            <span class="mono">MOD · 03</span>
+            <span class="lab-title">Kinetic Type</span>
+            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+          </div>
+          <div class="type-machine" id="typeMachine">
+            <div class="type-display" id="typeDisplay">BEAUTY</div>
+            <div class="type-grid" id="typeGrid" aria-hidden="true"></div>
+          </div>
+          <p class="lab-caption">Character matrix morph. Timing curves engineered for weight and snap.</p>
+        </article>
+
+        <!-- Module: Chronograph -->
+        <article class="lab-card lab-card--wide reveal">
+          <div class="lab-header">
+            <span class="mono">MOD · 04</span>
+            <span class="lab-title">Precision Chronograph</span>
+            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+          </div>
+          <div class="chrono" id="chrono">
+            <div class="chrono-face">
+              <canvas id="clock" width="280" height="280" aria-label="Precision analog clock"></canvas>
+            </div>
+            <div class="chrono-readouts">
+              <div class="chrono-row">
+                <span class="mono label">UTC</span>
+                <span class="mono value" id="utcTime">--:--:--.---</span>
+              </div>
+              <div class="chrono-row">
+                <span class="mono label">FRAME Δ</span>
+                <span class="mono value" id="frameDelta">0.00 ms</span>
+              </div>
+              <div class="chrono-row">
+                <span class="mono label">SESSION</span>
+                <span class="mono value" id="sessionTime">00:00:00</span>
+              </div>
+              <div class="chrono-row">
+                <span class="mono label">RENDER</span>
+                <span class="mono value" id="renderPath">RAF · CANVAS 2D</span>
               </div>
             </div>
           </div>
-          <div class="work-meta">
-            <div class="work-tags">
-              <span>Product</span><span>Dashboard</span><span>2025</span>
-            </div>
-            <h3>Aether Analytics</h3>
-            <p>Real-time intelligence platform for high-frequency operators. Zero-latency UI, cinematic data viz, enterprise-grade systems.</p>
-            <span class="work-link">View case study →</span>
-          </div>
+          <p class="lab-caption">Sub-frame timing. What you see is what we optimize for — every millisecond of presence.</p>
         </article>
+      </div>
 
-        <article class="work-card reveal" data-tilt>
-          <div class="work-visual" style="--accent: #ff4d6d">
-            <div class="work-visual-inner mono">
-              <span class="big-type">01</span>
-              <div class="type-grid">
-                <span>Aa</span><span>Bb</span><span>Cc</span>
-              </div>
-            </div>
-          </div>
-          <div class="work-meta">
-            <div class="work-tags">
-              <span>Brand</span><span>Identity</span>
-            </div>
-            <h3>Volt &amp; Vein</h3>
-            <p>Full brand system for a performance lifestyle label — type, motion, packaging, digital presence.</p>
-            <span class="work-link">View case study →</span>
-          </div>
-        </article>
-
-        <article class="work-card reveal" data-tilt>
-          <div class="work-visual" style="--accent: #7c9cff">
-            <div class="work-visual-inner mesh">
-              <div class="mesh-blob b1"></div>
-              <div class="mesh-blob b2"></div>
-              <div class="mesh-label">NEXUS</div>
-            </div>
-          </div>
-          <div class="work-meta">
-            <div class="work-tags">
-              <span>Web</span><span>3D</span>
-            </div>
-            <h3>Nexus Studio</h3>
-            <p>Immersive portfolio experience with WebGL depth, scroll-driven narrative, and sub-second loads.</p>
-            <span class="work-link">View case study →</span>
-          </div>
-        </article>
-
-        <article class="work-card work-card--wide reveal" data-tilt>
-          <div class="work-visual" style="--accent: #c4a7ff">
-            <div class="work-visual-inner commerce">
-              <div class="shop-hero"></div>
-              <div class="shop-row">
-                <div class="shop-item"></div>
-                <div class="shop-item"></div>
-                <div class="shop-item"></div>
-                <div class="shop-item"></div>
-              </div>
-            </div>
-          </div>
-          <div class="work-meta">
-            <div class="work-tags">
-              <span>E-commerce</span><span>Systems</span><span>2024</span>
-            </div>
-            <h3>Maison Rift</h3>
-            <p>Luxury retail reimagined — editorial product storytelling, seamless checkout, and a design system that scales across 14 locales.</p>
-            <span class="work-link">View case study →</span>
-          </div>
-        </article>
+      <div class="engine-manifesto reveal">
+        <blockquote>
+          <p>
+            Engineering is not the opposite of beauty.
+            It is the structure that lets beauty hold under load.
+          </p>
+          <footer>— JDE Performante</footer>
+        </blockquote>
       </div>
     </section>
 
-    <!-- ABOUT -->
-    <section class="section about" id="about">
-      <div class="about-grid">
-        <div class="about-copy">
-          <p class="eyebrow reveal">About JDE</p>
+    <!-- PARTNERS -->
+    <section class="section partners" id="partners">
+      <div class="section-head">
+        <p class="eyebrow reveal"><span class="red">02</span> — Partners</p>
+        <h2 class="section-title reveal">
+          Systems in the wild.<br />
+          <em>Live and linked.</em>
+        </h2>
+        <p class="section-lede reveal">
+          Select partners and properties we've engineered. Visit the work where it lives.
+        </p>
+      </div>
+
+      <div class="partner-grid">
+        <a class="partner-card reveal" href="https://github.com/enerjadez" target="_blank" rel="noopener noreferrer" data-magnetic>
+          <span class="partner-index mono">01</span>
+          <span class="partner-name">Enerjadez</span>
+          <span class="partner-role">Primary · Open systems</span>
+          <span class="partner-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="partner-card reveal" href="https://github.com/enerjadez" target="_blank" rel="noopener noreferrer" data-magnetic>
+          <span class="partner-index mono">02</span>
+          <span class="partner-name">Studio Link</span>
+          <span class="partner-role">Product · Interface</span>
+          <span class="partner-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="partner-card reveal" href="https://github.com/enerjadez" target="_blank" rel="noopener noreferrer" data-magnetic>
+          <span class="partner-index mono">03</span>
+          <span class="partner-name">Forge Works</span>
+          <span class="partner-role">Platform · Scale</span>
+          <span class="partner-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="partner-card reveal" href="https://github.com/enerjadez" target="_blank" rel="noopener noreferrer" data-magnetic>
+          <span class="partner-index mono">04</span>
+          <span class="partner-name">North Signal</span>
+          <span class="partner-role">Brand · Digital</span>
+          <span class="partner-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="partner-card reveal" href="https://github.com/enerjadez" target="_blank" rel="noopener noreferrer" data-magnetic>
+          <span class="partner-index mono">05</span>
+          <span class="partner-name">Apex Line</span>
+          <span class="partner-role">Commerce · Systems</span>
+          <span class="partner-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="partner-card reveal partner-card--cta" href="#contact" data-magnetic>
+          <span class="partner-index mono">++</span>
+          <span class="partner-name">Your name here</span>
+          <span class="partner-role">Next collaboration</span>
+          <span class="partner-arrow" aria-hidden="true">→</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- EXISTENCE / WHY -->
+    <section class="section existence">
+      <div class="exist-grid">
+        <div class="exist-copy">
+          <p class="eyebrow reveal"><span class="red">03</span> — Why we exist</p>
           <h2 class="section-title reveal">
-            Built for those who<br /><em>refuse average</em>
+            Awareness is not noise.<br />
+            <em>It is presence.</em>
           </h2>
-          <div class="about-text reveal">
+          <div class="exist-text reveal">
             <p>
-              JDE Performante is a design and engineering practice obsessed with the intersection of
-              aesthetics and velocity. Every interface is tuned like a race engine — responsive under pressure,
-              refined at idle, unforgettable in motion.
+              JDE Performante is a design and engineering practice.
+              We ship interfaces, systems, and brands that feel inevitable —
+              tuned like machines, composed like art.
             </p>
             <p>
-              From concept to production, we partner with founders, product teams, and cultural brands
-              who demand work that feels inevitable — not merely polished.
+              This site is intentionally not a gallery of case studies.
+              It is a signal: we are here, we build with precision,
+              and the work itself is the statement.
             </p>
           </div>
-          <div class="about-principles reveal">
-            <div class="principle">
-              <span class="principle-num">01</span>
-              <h4>Clarity over clutter</h4>
-              <p>Every pixel earns its place. Hierarchy is non-negotiable.</p>
-            </div>
-            <div class="principle">
-              <span class="principle-num">02</span>
-              <h4>Performance as craft</h4>
-              <p>Beauty that lags is unfinished. We ship fast and feel faster.</p>
-            </div>
-            <div class="principle">
-              <span class="principle-num">03</span>
-              <h4>Systems that scale</h4>
-              <p>Tokens, components, and language that grow with the product.</p>
-            </div>
-          </div>
         </div>
-        <div class="about-visual reveal">
-          <div class="portrait-card">
-            <div class="portrait-frame">
-              <div class="portrait-inner">
-                <span class="portrait-initials">JDE</span>
-                <div class="portrait-ring"></div>
-              </div>
-            </div>
-            <div class="portrait-caption">
-              <strong>JDE Performante</strong>
-              <span>Design · Engineering · Direction</span>
-            </div>
+        <div class="exist-metrics reveal">
+          <div class="metric">
+            <span class="metric-val" data-count="100">0</span>
+            <span class="metric-unit">%</span>
+            <span class="metric-label">Intention</span>
+          </div>
+          <div class="metric">
+            <span class="metric-val" data-count="0">0</span>
+            <span class="metric-unit">ms</span>
+            <span class="metric-label">Tolerance for lag</span>
+          </div>
+          <div class="metric">
+            <span class="metric-val mono" id="metricLive">∞</span>
+            <span class="metric-label">Obsession</span>
           </div>
         </div>
       </div>
-    </section>
-
-    <!-- CAPABILITIES -->
-    <section class="section capabilities" id="capabilities">
-      <div class="section-head">
-        <p class="eyebrow reveal">Capabilities</p>
-        <h2 class="section-title reveal">The full stack of<br /><em>digital dominance</em></h2>
-      </div>
-      <div class="cap-grid">
-        <div class="cap-card reveal" data-magnetic>
-          <span class="cap-icon">◈</span>
-          <h3>Product Design</h3>
-          <p>End-to-end UX/UI for SaaS, fintech, and consumer apps — research, flows, high-fidelity systems.</p>
-        </div>
-        <div class="cap-card reveal" data-magnetic>
-          <span class="cap-icon">⬡</span>
-          <h3>Frontend Engineering</h3>
-          <p>React, Vue, and vanilla excellence. Accessible, performant, animation-aware codebases.</p>
-        </div>
-        <div class="cap-card reveal" data-magnetic>
-          <span class="cap-icon">◎</span>
-          <h3>Brand &amp; Identity</h3>
-          <p>Visual languages, typography, voice, and motion that make a brand unforgettable.</p>
-        </div>
-        <div class="cap-card reveal" data-magnetic>
-          <span class="cap-icon">△</span>
-          <h3>Motion &amp; Interaction</h3>
-          <p>Micro-interactions, scroll narratives, and cinematic transitions that guide attention.</p>
-        </div>
-        <div class="cap-card reveal" data-magnetic>
-          <span class="cap-icon">◇</span>
-          <h3>Design Systems</h3>
-          <p>Token-driven libraries, documentation, and governance for multi-product teams.</p>
-        </div>
-        <div class="cap-card reveal" data-magnetic>
-          <span class="cap-icon">⬢</span>
-          <h3>Technical Direction</h3>
-          <p>Architecture reviews, performance audits, and creative tech strategy for launches that land.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- PROCESS -->
-    <section class="section process">
-      <div class="section-head">
-        <p class="eyebrow reveal">Process</p>
-        <h2 class="section-title reveal">How the work<br /><em>gets done</em></h2>
-      </div>
-      <ol class="process-list">
-        <li class="process-item reveal">
-          <span class="process-step">01</span>
-          <div>
-            <h3>Discover</h3>
-            <p>Deep dive into goals, users, constraints, and competitive landscape. No assumptions left unchallenged.</p>
-          </div>
-        </li>
-        <li class="process-item reveal">
-          <span class="process-step">02</span>
-          <div>
-            <h3>Define</h3>
-            <p>Strategy, information architecture, and a sharp creative north star. Alignment before pixels.</p>
-          </div>
-        </li>
-        <li class="process-item reveal">
-          <span class="process-step">03</span>
-          <div>
-            <h3>Design &amp; Build</h3>
-            <p>Iterative design paired with production-ready engineering. Design and code in lockstep.</p>
-          </div>
-        </li>
-        <li class="process-item reveal">
-          <span class="process-step">04</span>
-          <div>
-            <h3>Deliver &amp; Refine</h3>
-            <p>Ship, measure, polish. Handoff that teams can own — or continued partnership for velocity.</p>
-          </div>
-        </li>
-      </ol>
     </section>
 
     <!-- CONTACT -->
     <section class="section contact" id="contact">
       <div class="contact-panel reveal">
+        <div class="contact-scan" aria-hidden="true"></div>
         <div class="contact-copy">
-          <p class="eyebrow">Let's build</p>
+          <p class="eyebrow"><span class="red">04</span> — Contact</p>
           <h2 class="contact-title">
-            Ready to go<br /><em>performante?</em>
+            Ready to build<br />
+            <em>something that holds.</em>
           </h2>
           <p class="contact-lede">
-            Tell me about the product, brand, or experience you're building.
-            Serious inquiries only — ambitious preferred.
+            Serious collaborations only. Products, platforms, brands, and systems
+            that demand engineering magic and uncompromising beauty.
           </p>
         </div>
         <div class="contact-actions">
@@ -366,9 +337,10 @@
           </a>
           <div class="socials">
             <a href="https://github.com/enerjadez" target="_blank" rel="noopener noreferrer" data-magnetic>GitHub</a>
-            <a href="https://x.com" target="_blank" rel="noopener noreferrer" data-magnetic>X / Twitter</a>
+            <a href="https://x.com" target="_blank" rel="noopener noreferrer" data-magnetic>X</a>
             <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" data-magnetic>LinkedIn</a>
           </div>
+          <p class="contact-note mono">RESPONSE WINDOW · 24–48H · UTC</p>
         </div>
       </div>
     </section>
@@ -380,8 +352,8 @@
         <span class="logo-mark">JDE</span>
         <span class="logo-sub">Performante</span>
       </div>
-      <p class="footer-copy">© <span id="year"></span> JDE Performante. All rights reserved.</p>
-      <a href="#top" class="footer-top" data-magnetic>Back to top ↑</a>
+      <p class="footer-copy mono">© <span id="year"></span> · ENGINEERED IN THE OPEN</p>
+      <a href="#top" class="footer-top" data-magnetic>TOP ↑</a>
     </div>
   </footer>
 

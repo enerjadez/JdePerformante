@@ -508,13 +508,14 @@
   });
 
   // ═══════════════════════════════════════════════════════
-  // HERO field — full canvas paint: swipe finger = mesh art
+  // HERO field — paint ONLY after starting on the red cube gate
   // ═══════════════════════════════════════════════════════
   function initHeroField() {
     const canvas = document.getElementById("field");
     const paint = document.getElementById("heroPaint");
+    const gate = document.getElementById("heroGate");
     const hero = document.getElementById("hero") || canvas?.parentElement;
-    if (!canvas || !hero || !paint) return;
+    if (!canvas || !hero || !paint || !gate) return;
     const ctx = canvas.getContext("2d", { alpha: true });
     const hudCoords = document.getElementById("hudCoords");
     const hudFps = document.getElementById("hudFps");
@@ -527,13 +528,13 @@
     let frames = 0,
       fpsT = 0;
 
-    // Brush state: live tip + fading trail (so swipe paints a path of red mesh)
+    // Gate rule: free paint only while a stroke that BEGAN on the red cube is active
     const brush = {
       x: 0,
       y: 0,
       active: false,
       id: null,
-      painting: false, // true only while finger is down / mouse button down
+      painting: false,
     };
     /** @type {{x:number,y:number,life:number}[]} */
     const trail = [];
@@ -581,8 +582,9 @@
       document.documentElement.classList.toggle("is-hero-painting", on);
     };
 
+    // Field coords always relative to the full hero (not the small gate)
     const toField = (clientX, clientY) => {
-      const rect = paint.getBoundingClientRect();
+      const rect = hero.getBoundingClientRect();
       return {
         x: ((clientX - rect.left) / Math.max(1, rect.width)) * w,
         y: ((clientY - rect.top) / Math.max(1, rect.height)) * h,
@@ -594,7 +596,6 @@
       brush.x = p.x;
       brush.y = p.y;
       brush.active = true;
-      // Dense trail samples while painting so swipe leaves connected art
       if (brush.painting) {
         const last = trail[trail.length - 1];
         if (!last || Math.hypot(last.x - p.x, last.y - p.y) > 6) {
@@ -611,61 +612,64 @@
       }
     };
 
-    const startPaint = (e) => {
+    const endPaint = (e) => {
+      if (brush.id != null && e && e.pointerId != null && e.pointerId !== brush.id) return;
+      brush.painting = false;
+      brush.id = null;
+      brush.active = false;
+      lockScroll(false);
+      // Paint layer off again — page is fully scrollable until next cube gate
+      paint.style.pointerEvents = "none";
+      try {
+        if (e) gate.releasePointerCapture?.(e.pointerId);
+      } catch (_) {}
+      try {
+        if (e) paint.releasePointerCapture?.(e.pointerId);
+      } catch (_) {}
+    };
+
+    /**
+     * GATE: only pointerdown on the red cube opens a paint stroke.
+     * Capture is taken so the finger can leave the cube and swipe the whole hero.
+     */
+    const openGate = (e) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       brush.painting = true;
       brush.id = e.pointerId;
       lockScroll(true);
+      // Arm full-bleed paint layer for the rest of this stroke
+      paint.style.pointerEvents = "auto";
       stamp(e.clientX, e.clientY);
+      try {
+        // Capture on gate first — moves keep flowing even outside the cube
+        gate.setPointerCapture(e.pointerId);
+      } catch (_) {}
       try {
         paint.setPointerCapture(e.pointerId);
       } catch (_) {}
       if (e.cancelable) e.preventDefault();
-      return false;
     };
 
-    const movePaint = (e) => {
-      // Mouse hover (not painting): soft follow without trail lock
-      if (e.pointerType === "mouse" && !brush.painting) {
-        stamp(e.clientX, e.clientY);
-        brush.active = true;
-        return;
-      }
+    const moveStroke = (e) => {
       if (!brush.painting) return;
       if (brush.id != null && e.pointerId !== brush.id) return;
       stamp(e.clientX, e.clientY);
       if (e.cancelable) e.preventDefault();
-      return false;
     };
 
-    const endPaint = (e) => {
-      if (brush.id != null && e.pointerId !== brush.id) return;
-      const wasTouch = e.pointerType !== "mouse";
-      brush.painting = false;
-      brush.id = null;
-      lockScroll(false);
-      // Touch: release active; mouse: keep hover if still over
-      if (wasTouch) brush.active = false;
-      try {
-        paint.releasePointerCapture?.(e.pointerId);
-      } catch (_) {}
-    };
+    // ── Entry only via red cube gate ──────────────────────
+    gate.addEventListener("pointerdown", openGate, { passive: false });
+    gate.addEventListener("pointermove", moveStroke, { passive: false });
+    gate.addEventListener("pointerup", endPaint, { passive: false });
+    gate.addEventListener("pointercancel", endPaint, { passive: false });
 
-    // Primary path: Pointer Events on paint surface
-    paint.addEventListener("pointerdown", startPaint, { passive: false });
-    paint.addEventListener("pointermove", movePaint, { passive: false });
+    // While painting, paint layer also receives moves (after gate arming)
+    paint.addEventListener("pointermove", moveStroke, { passive: false });
     paint.addEventListener("pointerup", endPaint, { passive: false });
     paint.addEventListener("pointercancel", endPaint, { passive: false });
-    paint.addEventListener(
-      "pointerleave",
-      (e) => {
-        if (e.pointerType === "mouse" && !brush.painting) brush.active = false;
-      },
-      { passive: true }
-    );
 
-    // Hard fallback for iOS quirks — raw touch on paint only
-    paint.addEventListener(
+    // Raw touch fallbacks on the gate (iOS)
+    gate.addEventListener(
       "touchstart",
       (e) => {
         const t = e.touches[0];
@@ -673,30 +677,35 @@
         brush.painting = true;
         brush.id = "touch";
         lockScroll(true);
+        paint.style.pointerEvents = "auto";
         stamp(t.clientX, t.clientY);
         e.preventDefault();
       },
       { passive: false }
     );
-    paint.addEventListener(
-      "touchmove",
-      (e) => {
-        if (!brush.painting) return;
-        const t = e.touches[0];
-        if (!t) return;
-        stamp(t.clientX, t.clientY);
-        e.preventDefault();
-      },
-      { passive: false }
-    );
+    const touchMove = (e) => {
+      if (!brush.painting) return;
+      const t = e.touches[0];
+      if (!t) return;
+      stamp(t.clientX, t.clientY);
+      e.preventDefault();
+    };
+    gate.addEventListener("touchmove", touchMove, { passive: false });
+    paint.addEventListener("touchmove", touchMove, { passive: false });
     const touchEnd = () => {
       brush.painting = false;
       brush.id = null;
       brush.active = false;
       lockScroll(false);
+      paint.style.pointerEvents = "none";
     };
+    gate.addEventListener("touchend", touchEnd, { passive: false });
+    gate.addEventListener("touchcancel", touchEnd, { passive: false });
     paint.addEventListener("touchend", touchEnd, { passive: false });
     paint.addEventListener("touchcancel", touchEnd, { passive: false });
+
+    // IMPORTANT: no free hover paint — idle field stays calm; page stays normal
+    // Paint layer stays pointer-events:none until gate opens a stroke.
 
     createRunner(
       canvas,

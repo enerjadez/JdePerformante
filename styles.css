@@ -323,11 +323,12 @@ button {
   pointer-events: none;
 }
 
-/* Full-hero paint surface — sits above text so swipe never hits links/scroll */
+/* Paint layer: OFF by default (page stays scrollable). Armed only after red cube gate. */
 .hero-paint {
   position: absolute;
   inset: 0;
-  z-index: 8;
+  z-index: 7;
+  pointer-events: none;
   touch-action: none !important;
   cursor: crosshair;
   -webkit-user-select: none;
@@ -336,13 +337,17 @@ button {
   background: transparent;
 }
 
+.hero.is-painting .hero-paint {
+  pointer-events: auto;
+}
+
 .hero.is-painting {
   touch-action: none !important;
 }
 
 .hero.is-painting .hero-content a,
 .hero.is-painting .hero-content button {
-  pointer-events: none; /* no accidental link taps mid-swipe */
+  pointer-events: none;
 }
 
 html.is-hero-painting,
@@ -350,6 +355,86 @@ html.is-hero-painting body {
   overflow: hidden !important;
   touch-action: none !important;
   overscroll-behavior: none;
+}
+
+/* Red cube gate — only way into free canvas paint */
+.hero-gate {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(42%, 118px);
+  height: min(42%, 118px);
+  margin: calc(min(21%, 59px) * -1) 0 0 calc(min(21%, 59px) * -1);
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  pointer-events: auto;
+  z-index: 12;
+  cursor: crosshair;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.hero-gate-ring {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  border: 1px solid rgba(225, 6, 0, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(225, 6, 0, 0.15),
+    0 0 22px rgba(225, 6, 0, 0.35);
+  animation: gatePulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.hero-gate-label {
+  position: relative;
+  z-index: 1;
+  font-size: 0.5rem;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.hero-gate:hover .hero-gate-label,
+.hero-gate:focus-visible .hero-gate-label,
+.hero.is-painting .hero-gate-label {
+  color: #fff;
+  opacity: 1;
+}
+
+.hero-gate:focus-visible {
+  outline: none;
+}
+
+.hero-gate:focus-visible .hero-gate-ring {
+  border-color: #ff2a20;
+  box-shadow: 0 0 28px rgba(225, 6, 0, 0.65);
+}
+
+@keyframes gatePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+.hero.is-painting .hero-gate-ring {
+  animation: none;
+  border-color: var(--red);
+  box-shadow: 0 0 30px rgba(225, 6, 0, 0.7);
 }
 
 .hero-vignette {
@@ -388,7 +473,7 @@ html.is-hero-painting body {
   to { background-position: 0 100px; }
 }
 
-/* ─── CSS 3D stage (decorative float — not a drag target) ─── */
+/* ─── CSS 3D stage — red cube gate sits here ─── */
 .hero-3d {
   --par-x: 0deg;
   --par-y: 0deg;
@@ -398,11 +483,16 @@ html.is-hero-painting body {
   transform: translateY(-48%) rotateX(var(--par-x)) rotateY(var(--par-y));
   width: min(42vw, 420px);
   height: min(42vw, 420px);
-  z-index: 2;
-  pointer-events: none;
+  z-index: 11; /* above paint layer so gate is always hittable when idle */
+  pointer-events: none; /* children (gate) re-enable */
   perspective: 900px;
-  opacity: 0.9;
+  opacity: 0.95;
   transform-style: preserve-3d;
+}
+
+.hero.is-painting .hero-3d {
+  z-index: 6; /* while painting, free canvas sits above; gate not needed mid-stroke */
+  opacity: 0.35;
 }
 
 .scene-3d {
@@ -586,16 +676,16 @@ html.is-hero-painting body {
 
 .hero-content {
   position: relative;
-  z-index: 6; /* text visible above field; paint layer is 8 so swipe always paints */
+  z-index: 5;
   max-width: min(640px, 100%);
   padding-right: clamp(0rem, 8vw, 2rem);
   pointer-events: none;
 }
 
-/* Only CTAs sit above the paint layer so they remain tappable */
+/* CTAs always tappable when not mid-paint */
 .hero-content .hero-actions {
   position: relative;
-  z-index: 9;
+  z-index: 12;
   pointer-events: none;
 }
 
@@ -807,14 +897,22 @@ html.is-hero-painting body {
     padding-top: calc(var(--nav-h) + 2.5rem);
   }
   .hero-3d {
-    top: 16%;
+    top: 14%;
     right: 50%;
     transform: translate(50%, 0) rotateX(var(--par-x)) rotateY(var(--par-y));
-    width: min(48vw, 200px);
-    height: min(48vw, 200px);
-    opacity: 0.55;
-    z-index: 2;
+    width: min(52vw, 220px);
+    height: min(52vw, 220px);
+    opacity: 0.95;
+    z-index: 11;
     pointer-events: none;
+  }
+  .hero-gate {
+    width: min(48%, 128px);
+    height: min(48%, 128px);
+    margin: calc(min(24%, 64px) * -1) 0 0 calc(min(24%, 64px) * -1);
+  }
+  .hero-gate-label {
+    font-size: 0.48rem;
   }
   .hero-content {
     padding-right: 0;

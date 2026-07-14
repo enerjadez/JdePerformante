@@ -72,9 +72,9 @@
         </div>
       </div>
 
-      <!-- Floating 3D stage (decorative) -->
-      <div class="hero-3d" aria-hidden="true">
-        <div class="scene-3d" id="scene3d">
+      <!-- Floating 3D stage — red cube is the paint gate -->
+      <div class="hero-3d" id="hero3d">
+        <div class="scene-3d" id="scene3d" aria-hidden="true">
           <div class="cube cube-a">
             <div class="face f-front"></div>
             <div class="face f-back"></div>
@@ -100,9 +100,19 @@
             <div class="pyr-face pyr-4"></div>
           </div>
         </div>
+        <!-- Invisible hit target on the red cube — only entry to free paint -->
+        <button
+          type="button"
+          class="hero-gate"
+          id="heroGate"
+          aria-label="Hold the red cube, then swipe to paint the field"
+        >
+          <span class="hero-gate-ring" aria-hidden="true"></span>
+          <span class="hero-gate-label mono">HOLD · PAINT</span>
+        </button>
       </div>
 
-      <!-- Full-bleed paint surface: canvas-like finger tracking (under text, over field) -->
+      <!-- Paint layer only receives events mid-stroke after gate open -->
       <div class="hero-paint" id="heroPaint" aria-hidden="true"></div>
 
       <div class="hero-content">

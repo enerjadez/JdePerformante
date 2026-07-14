@@ -1159,6 +1159,178 @@ button {
 }
 
 /* Partners */
+/* Featured partnership tile — CMR Africa */
+.partner-feature {
+  --partner-accent: #a855f7;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.4fr auto;
+  gap: 1.5rem 2rem;
+  align-items: end;
+  padding: clamp(1.75rem, 4vw, 2.75rem);
+  margin-bottom: 1px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--partner-accent) 12%, #0a0a0a) 0%,
+      #0a0a0a 45%,
+      color-mix(in srgb, var(--red) 8%, #0a0a0a) 100%
+    );
+  overflow: hidden;
+  transition: border-color 0.4s, transform 0.4s var(--ease);
+}
+
+.partner-feature::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--partner-accent), var(--red));
+  z-index: 1;
+}
+
+.partner-feature-glow {
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: 55%;
+  height: 120%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--partner-accent) 22%, transparent),
+    transparent 65%
+  );
+  pointer-events: none;
+  transition: opacity 0.5s;
+  opacity: 0.85;
+}
+
+.partner-feature:hover {
+  border-color: color-mix(in srgb, var(--partner-accent) 45%, var(--border));
+}
+
+.partner-feature:hover .partner-feature-glow {
+  opacity: 1;
+}
+
+.partner-feature:hover .partner-feature-arrow {
+  color: var(--partner-accent);
+  transform: translate(4px, -4px);
+}
+
+.partner-feature-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+
+.partner-feature-badge {
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--partner-accent);
+  padding: 0.35rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--partner-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--partner-accent) 10%, transparent);
+}
+
+.partner-feature-arrow {
+  font-size: 1.25rem;
+  color: var(--text-dim);
+  transition: color 0.3s, transform 0.35s var(--ease);
+}
+
+.partner-feature-body {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+}
+
+.partner-feature-name {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 0.35rem;
+}
+
+.partner-feature-tagline {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+  color: var(--partner-accent);
+  margin-bottom: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.partner-feature-copy {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+}
+
+.partner-feature-link {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  transition: color 0.3s;
+}
+
+.partner-feature:hover .partner-feature-link {
+  color: var(--partner-accent);
+}
+
+.partner-feature-mark {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-weight: 800;
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  letter-spacing: 0.2em;
+  color: var(--text-dim);
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.35);
+  min-width: 120px;
+  text-align: center;
+}
+
+.partner-feature-x {
+  color: var(--partner-accent);
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.1rem;
+  letter-spacing: 0;
+}
+
+@media (max-width: 700px) {
+  .partner-feature {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .partner-feature-mark {
+    flex-direction: row;
+    gap: 0.75rem;
+    min-width: 0;
+    width: 100%;
+    letter-spacing: 0.12em;
+    font-size: 1rem;
+  }
+}
+
 .partner-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

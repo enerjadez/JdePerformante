@@ -1517,3 +1517,79 @@ button {
   .nav-logo .logo-sub { display: none; }
   .eyebrow { letter-spacing: 0.08em; }
 }
+
+/* ─── Touch / mobile performance lite ─── */
+.perf-lite,
+.perf-lite body {
+  cursor: auto !important;
+}
+
+.perf-lite .noise,
+.perf-lite .hero-scan,
+.perf-lite .contact-scan {
+  display: none !important;
+}
+
+.perf-lite .cursor,
+.perf-lite .cursor-ring {
+  display: none !important;
+}
+
+/* Simpler CSS 3D — single slow spin, no multi-axis chaos */
+.perf-lite .scene-3d {
+  animation: sceneSpin 40s linear infinite;
+}
+
+.perf-lite .cube-a,
+.perf-lite .cube-b,
+.perf-lite .ring-a,
+.perf-lite .ring-b,
+.perf-lite .pyramid {
+  animation-duration: 18s !important;
+}
+
+.perf-lite .type-grid {
+  animation: none;
+  opacity: 0.4;
+}
+
+.perf-lite .hero-ticker .ticker-track {
+  animation-duration: 55s;
+}
+
+.perf-lite .lab-canvas {
+  touch-action: manipulation;
+  cursor: auto;
+}
+
+/* Prefer compositing over paint thrash on touch scroll */
+.perf-lite .hero-canvas,
+.perf-lite .lab-canvas,
+.perf-lite .scope-canvas {
+  contain: strict;
+}
+
+@media (pointer: coarse) {
+  body {
+    cursor: auto;
+  }
+  .cursor,
+  .cursor-ring {
+    display: none !important;
+  }
+  .noise {
+    opacity: 0.02;
+  }
+  a, button {
+    cursor: pointer;
+  }
+  /* Larger tap targets */
+  .nav-links a,
+  .partner-card,
+  .btn {
+    -webkit-tap-highlight-color: rgba(225, 6, 0, 0.15);
+  }
+  .partner-card {
+    min-height: 72px;
+  }
+}

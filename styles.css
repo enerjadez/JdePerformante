@@ -1118,9 +1118,8 @@ button {
   .btn-lg {
     width: 100%;
     justify-content: center;
-    font-size: 0.78rem;
+    font-size: 0.85rem;
     padding: 1rem 1.1rem;
-    word-break: break-all;
   }
   .footer-inner {
     flex-direction: column;

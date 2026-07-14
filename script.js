@@ -388,9 +388,9 @@
       canvas.width = (w * dpr) | 0;
       canvas.height = (h * dpr) | 0;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const density = perfLite ? 12000 : 5500;
-      const minN = perfLite ? 48 : 100;
-      const maxN = perfLite ? 90 : 220;
+      const density = perfLite ? 6000 : 2800;
+      const minN = perfLite ? 90 : 180;
+      const maxN = perfLite ? 160 : 380;
       const count = Math.max(minN, Math.min(maxN, ((w * h) / density) | 0));
       nodes = Array.from({ length: count }, () => spawn());
       if (hudNodes) hudNodes.textContent = `NODES ${nodes.length}`;

@@ -380,7 +380,8 @@
   });
 
   // ═══════════════════════════════════════════════════════
-  // HERO field — same physics desktop + mobile (touch = mouse)
+  // HERO field — free drift idle; mouse/touch influence only
+  // when intentional (scroll on mobile does NOT attract)
   // ═══════════════════════════════════════════════════════
   function initHeroField() {
     const canvas = document.getElementById("field");
@@ -396,47 +397,64 @@
       h = 0,
       dpr = 1,
       nodes = [];
-    // Pointer: mouse hover OR finger down — identical influence
-    const pointer = { x: 0, y: 0, active: false, touch: false };
     let frames = 0,
       fpsT = 0;
+
+    // Influence is OFF unless mouse is hovering OR finger is in "play" mode
+    const ptr = {
+      x: 0,
+      y: 0,
+      active: false, // drives physics + red accent
+      // touch session state
+      down: false,
+      id: null,
+      startX: 0,
+      startY: 0,
+      startScroll: 0,
+      playing: false, // true once we know it's a field drag, not a page scroll
+      cancelled: false,
+    };
 
     const spawn = (edge) => {
       let x = Math.random() * w;
       let y = Math.random() * h;
       if (edge === "right") x = w + 8;
       if (edge === "left") x = -8;
+      if (edge === "top") y = -8;
+      if (edge === "bottom") y = h + 8;
       return {
         x,
         y,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        r: Math.random() * 1.5 + 0.55,
+        vx: (Math.random() - 0.5) * 0.35,
+        vy: (Math.random() - 0.5) * 0.35,
+        r: Math.random() * 1.4 + 0.55,
         pulse: Math.random() * Math.PI * 2,
       };
     };
 
     const resize = () => {
-      dpr = maxDpr;
-      w = Math.round(hero.clientWidth || window.innerWidth);
-      h = Math.round(hero.clientHeight || window.innerHeight);
-      if (w < 2 || h < 2) {
-        w = window.innerWidth;
-        h = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = Math.max(1, Math.round(hero.clientWidth || window.innerWidth));
+      h = Math.max(1, Math.round(hero.clientHeight || window.innerHeight));
+      const bw = Math.round(w * dpr);
+      const bh = Math.round(h * dpr);
+      if (canvas.width !== bw || canvas.height !== bh) {
+        canvas.width = bw;
+        canvas.height = bh;
+        canvas.style.width = w + "px";
+        canvas.style.height = h + "px";
       }
-      canvas.width = Math.round(w * dpr);
-      canvas.height = Math.round(h * dpr);
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const density = isMobile ? 4200 : 2800;
-      const minN = isMobile ? 100 : 180;
-      const maxN = isMobile ? 180 : 340;
-      const count = Math.max(minN, Math.min(maxN, ((w * h) / density) | 0));
-      // Keep positions if count similar; full respawn on big change
-      if (Math.abs(nodes.length - count) > 20 || !nodes.length) {
+      // Same density logic — only rebuild if empty or huge size change
+      const density = 3200;
+      const count = Math.max(120, Math.min(isMobile ? 200 : 320, ((w * h) / density) | 0));
+      if (!nodes.length) {
         nodes = Array.from({ length: count }, () => spawn());
+      } else if (Math.abs(nodes.length - count) > 40) {
+        // resize existing set without full clump-respawn
+        while (nodes.length < count) nodes.push(spawn());
+        while (nodes.length > count) nodes.pop();
       }
       if (hudNodes) hudNodes.textContent = `NODES ${nodes.length}`;
     };
@@ -444,94 +462,152 @@
     resize();
     requestAnimationFrame(() => requestAnimationFrame(resize));
 
-    // Map client coords → canvas field space
-    const track = (clientX, clientY, active) => {
+    const toField = (clientX, clientY) => {
       const rect = canvas.getBoundingClientRect();
-      const scaleX = w / Math.max(1, rect.width);
-      const scaleY = h / Math.max(1, rect.height);
-      pointer.x = (clientX - rect.left) * scaleX;
-      pointer.y = (clientY - rect.top) * scaleY;
-      pointer.active = active;
-      if (hudCoords && pointer.active) {
-        hudCoords.textContent = `X ${((pointer.x / w) * 2 - 1).toFixed(3)} · Y ${((pointer.y / h) * 2 - 1).toFixed(3)}`;
+      return {
+        x: ((clientX - rect.left) / Math.max(1, rect.width)) * w,
+        y: ((clientY - rect.top) / Math.max(1, rect.height)) * h,
+      };
+    };
+
+    const setActiveAt = (clientX, clientY, on) => {
+      if (on) {
+        const p = toField(clientX, clientY);
+        ptr.x = p.x;
+        ptr.y = p.y;
+        ptr.active = true;
+        if (hudCoords) {
+          hudCoords.textContent = `X ${((ptr.x / w) * 2 - 1).toFixed(3)} · Y ${((ptr.y / h) * 2 - 1).toFixed(3)}`;
+        }
+      } else {
+        ptr.active = false;
       }
     };
 
-    // Unified pointer events (mouse + touch + pen) — same behaviour everywhere
+    // ── Mouse = classic desktop hover ─────────────────────
     hero.addEventListener(
       "pointermove",
       (e) => {
-        if (e.pointerType === "mouse") {
-          track(e.clientX, e.clientY, true);
-        } else if (pointer.touch) {
-          // Finger dragged — follow exactly like mouse
-          track(e.clientX, e.clientY, true);
-        }
+        if (e.pointerType !== "mouse") return;
+        setActiveAt(e.clientX, e.clientY, true);
       },
       { passive: true }
     );
-
-    hero.addEventListener(
-      "pointerdown",
-      (e) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        if (e.pointerType !== "mouse") {
-          pointer.touch = true;
-          try {
-            hero.setPointerCapture(e.pointerId);
-          } catch (_) {}
-        }
-        track(e.clientX, e.clientY, true);
-      },
-      { passive: true }
-    );
-
-    const endTouch = (e) => {
-      if (e.pointerType === "mouse") return;
-      pointer.touch = false;
-      pointer.active = false;
-      try {
-        hero.releasePointerCapture?.(e.pointerId);
-      } catch (_) {}
-    };
-    hero.addEventListener("pointerup", endTouch, { passive: true });
-    hero.addEventListener("pointercancel", endTouch, { passive: true });
-
     hero.addEventListener(
       "pointerleave",
       (e) => {
-        // Mouse leaves hero → release influence; touch handled by up/cancel
-        if (e.pointerType === "mouse") pointer.active = false;
+        if (e.pointerType === "mouse") ptr.active = false;
       },
       { passive: true }
     );
 
-    // Fallback for older mobile browsers without good pointer events
+    // ── Touch / pen: ONLY engage if NOT scrolling the page ─
+    // This was the mobile "auto clump" bug: every scroll-touch
+    // pulled the whole field to the finger.
     hero.addEventListener(
-      "touchstart",
+      "pointerdown",
       (e) => {
-        const t = e.touches[0];
-        if (!t) return;
-        pointer.touch = true;
-        track(t.clientX, t.clientY, true);
+        if (e.pointerType === "mouse") return;
+        ptr.down = true;
+        ptr.id = e.pointerId;
+        ptr.startX = e.clientX;
+        ptr.startY = e.clientY;
+        ptr.startScroll = window.scrollY || window.pageYOffset || 0;
+        ptr.playing = false;
+        ptr.cancelled = false;
+        ptr.active = false; // stay idle until we know it's a field gesture
       },
       { passive: true }
     );
+
     hero.addEventListener(
-      "touchmove",
+      "pointermove",
       (e) => {
-        const t = e.touches[0];
-        if (!t || !pointer.touch) return;
-        track(t.clientX, t.clientY, true);
+        if (e.pointerType === "mouse") return;
+        if (!ptr.down || e.pointerId !== ptr.id || ptr.cancelled) return;
+
+        const scrollNow = window.scrollY || window.pageYOffset || 0;
+        const scrolled = Math.abs(scrollNow - ptr.startScroll) > 6;
+        const dx = e.clientX - ptr.startX;
+        const dy = e.clientY - ptr.startY;
+        const moved = Math.hypot(dx, dy);
+
+        // Page is scrolling → kill influence immediately (let them scroll)
+        if (scrolled) {
+          ptr.cancelled = true;
+          ptr.playing = false;
+          ptr.active = false;
+          return;
+        }
+
+        // Mostly vertical finger move without scroll yet → treat as scroll intent
+        if (!ptr.playing && moved > 10 && Math.abs(dy) > Math.abs(dx) * 1.4) {
+          ptr.cancelled = true;
+          ptr.active = false;
+          return;
+        }
+
+        // Horizontal-ish drag, or a held press with small movement → play field
+        if (!ptr.playing && moved > 8) {
+          ptr.playing = true;
+        }
+        // Long press in place (no scroll) also plays
+        if (!ptr.playing && moved < 8) {
+          // activate after brief hold via timestamp check in frame — arm on move anyway for small moves after 120ms
+        }
+
+        if (ptr.playing) {
+          setActiveAt(e.clientX, e.clientY, true);
+        }
       },
       { passive: true }
     );
-    const touchEnd = () => {
-      pointer.touch = false;
-      pointer.active = false;
+
+    // Hold-in-place arming (tap-hold without scroll = interact)
+    let holdTimer = 0;
+    hero.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (e.pointerType === "mouse") return;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => {
+          if (ptr.down && !ptr.cancelled && !ptr.playing) {
+            const scrollNow = window.scrollY || window.pageYOffset || 0;
+            if (Math.abs(scrollNow - ptr.startScroll) <= 6) {
+              ptr.playing = true;
+              setActiveAt(ptr.startX, ptr.startY, true);
+            }
+          }
+        }, 140);
+      },
+      { passive: true }
+    );
+
+    const endPointer = (e) => {
+      if (e.pointerType === "mouse") return;
+      if (ptr.id != null && e.pointerId !== ptr.id) return;
+      clearTimeout(holdTimer);
+      ptr.down = false;
+      ptr.id = null;
+      ptr.playing = false;
+      ptr.cancelled = false;
+      ptr.active = false;
     };
-    hero.addEventListener("touchend", touchEnd, { passive: true });
-    hero.addEventListener("touchcancel", touchEnd, { passive: true });
+    hero.addEventListener("pointerup", endPointer, { passive: true });
+    hero.addEventListener("pointercancel", endPointer, { passive: true });
+
+    // If user scrolls the page by any means while finger is down, kill influence
+    window.addEventListener(
+      "scroll",
+      () => {
+        if (ptr.down) {
+          ptr.cancelled = true;
+          ptr.playing = false;
+          ptr.active = false;
+        }
+      },
+      { passive: true }
+    );
 
     createRunner(
       canvas,
@@ -540,6 +616,9 @@
           resize();
           return;
         }
+
+        // Clamp dt so a tab-switch / jank frame never flings nodes into a clump
+        const step = Math.min(dt, 1.5);
 
         frames++;
         if (now - fpsT > 400) {
@@ -550,72 +629,87 @@
 
         ctx.clearRect(0, 0, w, h);
 
-        const attractR = 190;
-        const linkDist = Math.max(110, Math.min(w, h) * 0.14);
-        const redLinkR = 170; // distance from pointer for red accent links
         const nLen = nodes.length;
+        const attractR = 185;
+        const linkDist = Math.max(100, Math.min(w, h) * 0.13);
+        const redR = 165;
+        const redLim = redR * redR;
+        const lim = linkDist * linkDist;
 
-        // Soft glow under finger / cursor
-        if (pointer.active) {
-          const g = ctx.createRadialGradient(
-            pointer.x,
-            pointer.y,
-            0,
-            pointer.x,
-            pointer.y,
-            200
-          );
+        if (ptr.active) {
+          const g = ctx.createRadialGradient(ptr.x, ptr.y, 0, ptr.x, ptr.y, 190);
           g.addColorStop(0, "rgba(225,6,0,0.14)");
-          g.addColorStop(0.45, "rgba(225,6,0,0.05)");
+          g.addColorStop(0.5, "rgba(225,6,0,0.04)");
           g.addColorStop(1, "transparent");
           ctx.fillStyle = g;
           ctx.fillRect(0, 0, w, h);
         }
 
-        // Physics — no center pull, no inter-node springs (those caused mobile clumping)
+        // ── Physics: free drift unless ptr.active ─────────
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
-          if (pointer.active) {
-            const dx = pointer.x - n.x;
-            const dy = pointer.y - n.y;
+
+          if (ptr.active) {
+            const dx = ptr.x - n.x;
+            const dy = ptr.y - n.y;
             const dist = Math.hypot(dx, dy) || 1;
             if (dist < attractR) {
-              const f = (1 - dist / attractR) * 0.1;
-              n.vx += (dx / dist) * f * dt;
-              n.vy += (dy / dist) * f * dt;
+              // Same force curve as classic desktop field
+              const f = (1 - dist / attractR) * 0.095;
+              n.vx += (dx / dist) * f * step;
+              n.vy += (dy / dist) * f * step;
             }
           }
-          n.vx *= 0.99;
-          n.vy *= 0.99;
-          n.x += n.vx * dt * 1.25;
-          n.y += n.vy * dt * 1.25;
-          n.pulse += 0.035 * dt;
 
-          // Respawn at edge when far out (same as classic desktop feel)
-          if (n.x < -20 || n.x > w + 20 || n.y < -20 || n.y > h + 20) {
-            Object.assign(n, spawn(Math.random() > 0.5 ? "left" : "right"));
+          // Stronger damping when idle so the field settles open (no residual swirl)
+          n.vx *= ptr.active ? 0.99 : 0.985;
+          n.vy *= ptr.active ? 0.99 : 0.985;
+
+          // Cap speed — prevents orbital clumping after a strong pull
+          const sp = Math.hypot(n.vx, n.vy);
+          const maxSp = ptr.active ? 2.8 : 1.2;
+          if (sp > maxSp) {
+            n.vx = (n.vx / sp) * maxSp;
+            n.vy = (n.vy / sp) * maxSp;
+          }
+
+          n.x += n.vx * step * 1.2;
+          n.y += n.vy * step * 1.2;
+          n.pulse += 0.03 * step;
+
+          // Edge bounce (not wrap, not center-pull) — keeps distribution open
+          if (n.x < 0) {
+            n.x = 0;
+            n.vx = Math.abs(n.vx) * 0.8;
+          } else if (n.x > w) {
+            n.x = w;
+            n.vx = -Math.abs(n.vx) * 0.8;
+          }
+          if (n.y < 0) {
+            n.y = 0;
+            n.vy = Math.abs(n.vy) * 0.8;
+          } else if (n.y > h) {
+            n.y = h;
+            n.vy = -Math.abs(n.vy) * 0.8;
           }
         }
 
-        // Spatial hash for links
+        // ── Links ─────────────────────────────────────────
         const cell = linkDist;
         const grid = new Map();
         const key = (cx, cy) => cx + "," + cy;
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
           const k = key((n.x / cell) | 0, (n.y / cell) | 0);
-          let bucket = grid.get(k);
-          if (!bucket) {
-            bucket = [];
-            grid.set(k, bucket);
+          let b = grid.get(k);
+          if (!b) {
+            b = [];
+            grid.set(k, b);
           }
-          bucket.push(i);
+          b.push(i);
         }
 
-        const lim = linkDist * linkDist;
-        const redLim = redLinkR * redLinkR;
         ctx.lineCap = "round";
-
         for (let i = 0; i < nLen; i++) {
           const a = nodes[i];
           const cxi = (a.x / cell) | 0;
@@ -633,33 +727,30 @@
                 const d2 = dx * dx + dy * dy;
                 if (d2 >= lim || d2 < 0.5) continue;
                 const d = Math.sqrt(d2);
-                const alpha = (1 - d / linkDist) * 0.38;
+                const alpha = (1 - d / linkDist) * 0.36;
 
-                // Red accent when either endpoint (or mid) is near pointer — desktop look
                 let hot = false;
-                if (pointer.active) {
-                  const mx = (a.x + b.x) * 0.5;
-                  const my = (a.y + b.y) * 0.5;
-                  const dMid =
-                    (mx - pointer.x) * (mx - pointer.x) +
-                    (my - pointer.y) * (my - pointer.y);
-                  const dA =
-                    (a.x - pointer.x) * (a.x - pointer.x) +
-                    (a.y - pointer.y) * (a.y - pointer.y);
-                  const dB =
-                    (b.x - pointer.x) * (b.x - pointer.x) +
-                    (b.y - pointer.y) * (b.y - pointer.y);
-                  hot = dMid < redLim || dA < redLim * 0.7 || dB < redLim * 0.7;
+                if (ptr.active) {
+                  const mx = (a.x + b.x) * 0.5 - ptr.x;
+                  const my = (a.y + b.y) * 0.5 - ptr.y;
+                  const da = a.x - ptr.x;
+                  const db = a.y - ptr.y;
+                  const dc = b.x - ptr.x;
+                  const dd = b.y - ptr.y;
+                  hot =
+                    mx * mx + my * my < redLim ||
+                    da * da + db * db < redLim * 0.65 ||
+                    dc * dc + dd * dd < redLim * 0.65;
                 }
 
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
                 if (hot) {
-                  ctx.strokeStyle = `rgba(225,6,0,${Math.min(0.95, alpha * 2.2)})`;
-                  ctx.lineWidth = 1.15;
+                  ctx.strokeStyle = `rgba(225,6,0,${Math.min(0.95, alpha * 2.4)})`;
+                  ctx.lineWidth = 1.2;
                 } else {
-                  ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.55})`;
+                  ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.5})`;
                   ctx.lineWidth = 0.65;
                 }
                 ctx.stroke();
@@ -668,36 +759,34 @@
           }
         }
 
-        // Nodes
+        // ── Nodes ─────────────────────────────────────────
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
           const glow = 0.48 + Math.sin(n.pulse) * 0.22;
-          const near =
-            pointer.active && Math.hypot(n.x - pointer.x, n.y - pointer.y) < 100;
+          const near = ptr.active && Math.hypot(n.x - ptr.x, n.y - ptr.y) < 95;
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.r * (near ? 1.85 : 1), 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, n.r * (near ? 1.9 : 1), 0, Math.PI * 2);
           ctx.fillStyle = near ? `rgba(225,6,0,${glow})` : `${WHITE}${glow})`;
           ctx.fill();
           if (near) {
             ctx.beginPath();
-            ctx.arc(n.x, n.y, n.r * 3.2, 0, Math.PI * 2);
+            ctx.arc(n.x, n.y, n.r * 3.4, 0, Math.PI * 2);
             ctx.fillStyle = "rgba(225,6,0,0.12)";
             ctx.fill();
           }
         }
 
-        // Crosshair at pointer (desktop + mobile)
-        if (pointer.active) {
+        if (ptr.active) {
           ctx.strokeStyle = "rgba(225,6,0,0.55)";
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(pointer.x - 14, pointer.y);
-          ctx.lineTo(pointer.x + 14, pointer.y);
-          ctx.moveTo(pointer.x, pointer.y - 14);
-          ctx.lineTo(pointer.x, pointer.y + 14);
+          ctx.moveTo(ptr.x - 14, ptr.y);
+          ctx.lineTo(ptr.x + 14, ptr.y);
+          ctx.moveTo(ptr.x, ptr.y - 14);
+          ctx.lineTo(ptr.x, ptr.y + 14);
           ctx.stroke();
           ctx.beginPath();
-          ctx.arc(pointer.x, pointer.y, 24, 0, Math.PI * 2);
+          ctx.arc(ptr.x, ptr.y, 24, 0, Math.PI * 2);
           ctx.strokeStyle = "rgba(225,6,0,0.28)";
           ctx.stroke();
         }

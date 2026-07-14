@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="JDE Performante — Elite digital craft. Portfolio of precision design, performance engineering, and uncompromising interfaces." />
+  <meta name="theme-color" content="#050505" />
+  <meta property="og:title" content="JDE Performante" />
+  <meta property="og:description" content="Elite digital craft. Design & engineering portfolio." />
+  <meta property="og:type" content="website" />
+  <title>JDE Performante — Elite Digital Craft</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23050505' width='100' height='100'/><text y='.9em' font-size='80' x='8' fill='%23e8ff47'>J</text></svg>" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="cursor" id="cursor" aria-hidden="true"></div>
+  <div class="cursor-trail" id="cursorTrail" aria-hidden="true"></div>
+
+  <header class="nav" id="nav">
+    <a href="#top" class="nav-logo" data-magnetic>
+      <span class="logo-mark">JDE</span>
+      <span class="logo-sub">Performante</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#work" data-magnetic>Work</a>
+      <a href="#about" data-magnetic>About</a>
+      <a href="#capabilities" data-magnetic>Capabilities</a>
+      <a href="#contact" class="nav-cta" data-magnetic>Contact</a>
+    </nav>
+    <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span>
+    </button>
+  </header>
+
+  <div class="mobile-menu" id="mobileMenu" hidden>
+    <a href="#work">Work</a>
+    <a href="#about">About</a>
+    <a href="#capabilities">Capabilities</a>
+    <a href="#contact">Contact</a>
+  </div>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="grid-lines"></div>
+      </div>
+      <div class="hero-content">
+        <p class="eyebrow reveal">
+          <span class="pulse"></span>
+          Available for select collaborations
+        </p>
+        <h1 class="hero-title">
+          <span class="line reveal"><span class="line-inner">Precision.</span></span>
+          <span class="line reveal"><span class="line-inner italic">Performance.</span></span>
+          <span class="line reveal"><span class="line-inner">Presence.</span></span>
+        </h1>
+        <p class="hero-lede reveal">
+          JDE Performante crafts digital experiences that move at the speed of ambition —
+          engineered interfaces, cinematic brands, and products built to dominate.
+        </p>
+        <div class="hero-actions reveal">
+          <a href="#work" class="btn btn-primary" data-magnetic>
+            <span>View selected work</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+          <a href="#contact" class="btn btn-ghost" data-magnetic>Start a project</a>
+        </div>
+      </div>
+      <div class="hero-stats reveal">
+        <div class="stat">
+          <span class="stat-num" data-count="48">0</span>
+          <span class="stat-label">Projects shipped</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num" data-count="12">0</span>
+          <span class="stat-label">Years crafting</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num" data-count="100">0</span>
+          <span class="stat-label">% intentional</span>
+        </div>
+      </div>
+      <a href="#work" class="scroll-hint" aria-label="Scroll to work">
+        <span>Scroll</span>
+        <div class="scroll-line"></div>
+      </a>
+    </section>
+
+    <!-- MARQUEE -->
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span>Interface Design</span><span class="dot">◆</span>
+        <span>Product Engineering</span><span class="dot">◆</span>
+        <span>Brand Systems</span><span class="dot">◆</span>
+        <span>Motion Design</span><span class="dot">◆</span>
+        <span>Web Performance</span><span class="dot">◆</span>
+        <span>Creative Direction</span><span class="dot">◆</span>
+        <span>Interface Design</span><span class="dot">◆</span>
+        <span>Product Engineering</span><span class="dot">◆</span>
+        <span>Brand Systems</span><span class="dot">◆</span>
+        <span>Motion Design</span><span class="dot">◆</span>
+        <span>Web Performance</span><span class="dot">◆</span>
+        <span>Creative Direction</span><span class="dot">◆</span>
+      </div>
+    </div>
+
+    <!-- WORK -->
+    <section class="section work" id="work">
+      <div class="section-head">
+        <p class="eyebrow reveal">Selected work</p>
+        <h2 class="section-title reveal">Case studies that<br /><em>set the pace</em></h2>
+      </div>
+
+      <div class="work-grid">
+        <article class="work-card work-card--lg reveal" data-tilt>
+          <div class="work-visual" style="--accent: #e8ff47">
+            <div class="work-visual-inner">
+              <div class="mock-ui">
+                <div class="mock-bar"><span></span><span></span><span></span></div>
+                <div class="mock-body">
+                  <div class="mock-sidebar"></div>
+                  <div class="mock-main">
+                    <div class="mock-line w80"></div>
+                    <div class="mock-line w60"></div>
+                    <div class="mock-cards">
+                      <div class="mock-card"></div>
+                      <div class="mock-card"></div>
+                      <div class="mock-card"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="work-meta">
+            <div class="work-tags">
+              <span>Product</span><span>Dashboard</span><span>2025</span>
+            </div>
+            <h3>Aether Analytics</h3>
+            <p>Real-time intelligence platform for high-frequency operators. Zero-latency UI, cinematic data viz, enterprise-grade systems.</p>
+            <span class="work-link">View case study →</span>
+          </div>
+        </article>
+
+        <article class="work-card reveal" data-tilt>
+          <div class="work-visual" style="--accent: #ff4d6d">
+            <div class="work-visual-inner mono">
+              <span class="big-type">01</span>
+              <div class="type-grid">
+                <span>Aa</span><span>Bb</span><span>Cc</span>
+              </div>
+            </div>
+          </div>
+          <div class="work-meta">
+            <div class="work-tags">
+              <span>Brand</span><span>Identity</span>
+            </div>
+            <h3>Volt &amp; Vein</h3>
+            <p>Full brand system for a performance lifestyle label — type, motion, packaging, digital presence.</p>
+            <span class="work-link">View case study →</span>
+          </div>
+        </article>
+
+        <article class="work-card reveal" data-tilt>
+          <div class="work-visual" style="--accent: #7c9cff">
+            <div class="work-visual-inner mesh">
+              <div class="mesh-blob b1"></div>
+              <div class="mesh-blob b2"></div>
+              <div class="mesh-label">NEXUS</div>
+            </div>
+          </div>
+          <div class="work-meta">
+            <div class="work-tags">
+              <span>Web</span><span>3D</span>
+            </div>
+            <h3>Nexus Studio</h3>
+            <p>Immersive portfolio experience with WebGL depth, scroll-driven narrative, and sub-second loads.</p>
+            <span class="work-link">View case study →</span>
+          </div>
+        </article>
+
+        <article class="work-card work-card--wide reveal" data-tilt>
+          <div class="work-visual" style="--accent: #c4a7ff">
+            <div class="work-visual-inner commerce">
+              <div class="shop-hero"></div>
+              <div class="shop-row">
+                <div class="shop-item"></div>
+                <div class="shop-item"></div>
+                <div class="shop-item"></div>
+                <div class="shop-item"></div>
+              </div>
+            </div>
+          </div>
+          <div class="work-meta">
+            <div class="work-tags">
+              <span>E-commerce</span><span>Systems</span><span>2024</span>
+            </div>
+            <h3>Maison Rift</h3>
+            <p>Luxury retail reimagined — editorial product storytelling, seamless checkout, and a design system that scales across 14 locales.</p>
+            <span class="work-link">View case study →</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="section about" id="about">
+      <div class="about-grid">
+        <div class="about-copy">
+          <p class="eyebrow reveal">About JDE</p>
+          <h2 class="section-title reveal">
+            Built for those who<br /><em>refuse average</em>
+          </h2>
+          <div class="about-text reveal">
+            <p>
+              JDE Performante is a design and engineering practice obsessed with the intersection of
+              aesthetics and velocity. Every interface is tuned like a race engine — responsive under pressure,
+              refined at idle, unforgettable in motion.
+            </p>
+            <p>
+              From concept to production, we partner with founders, product teams, and cultural brands
+              who demand work that feels inevitable — not merely polished.
+            </p>
+          </div>
+          <div class="about-principles reveal">
+            <div class="principle">
+              <span class="principle-num">01</span>
+              <h4>Clarity over clutter</h4>
+              <p>Every pixel earns its place. Hierarchy is non-negotiable.</p>
+            </div>
+            <div class="principle">
+              <span class="principle-num">02</span>
+              <h4>Performance as craft</h4>
+              <p>Beauty that lags is unfinished. We ship fast and feel faster.</p>
+            </div>
+            <div class="principle">
+              <span class="principle-num">03</span>
+              <h4>Systems that scale</h4>
+              <p>Tokens, components, and language that grow with the product.</p>
+            </div>
+          </div>
+        </div>
+        <div class="about-visual reveal">
+          <div class="portrait-card">
+            <div class="portrait-frame">
+              <div class="portrait-inner">
+                <span class="portrait-initials">JDE</span>
+                <div class="portrait-ring"></div>
+              </div>
+            </div>
+            <div class="portrait-caption">
+              <strong>JDE Performante</strong>
+              <span>Design · Engineering · Direction</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CAPABILITIES -->
+    <section class="section capabilities" id="capabilities">
+      <div class="section-head">
+        <p class="eyebrow reveal">Capabilities</p>
+        <h2 class="section-title reveal">The full stack of<br /><em>digital dominance</em></h2>
+      </div>
+      <div class="cap-grid">
+        <div class="cap-card reveal" data-magnetic>
+          <span class="cap-icon">◈</span>
+          <h3>Product Design</h3>
+          <p>End-to-end UX/UI for SaaS, fintech, and consumer apps — research, flows, high-fidelity systems.</p>
+        </div>
+        <div class="cap-card reveal" data-magnetic>
+          <span class="cap-icon">⬡</span>
+          <h3>Frontend Engineering</h3>
+          <p>React, Vue, and vanilla excellence. Accessible, performant, animation-aware codebases.</p>
+        </div>
+        <div class="cap-card reveal" data-magnetic>
+          <span class="cap-icon">◎</span>
+          <h3>Brand &amp; Identity</h3>
+          <p>Visual languages, typography, voice, and motion that make a brand unforgettable.</p>
+        </div>
+        <div class="cap-card reveal" data-magnetic>
+          <span class="cap-icon">△</span>
+          <h3>Motion &amp; Interaction</h3>
+          <p>Micro-interactions, scroll narratives, and cinematic transitions that guide attention.</p>
+        </div>
+        <div class="cap-card reveal" data-magnetic>
+          <span class="cap-icon">◇</span>
+          <h3>Design Systems</h3>
+          <p>Token-driven libraries, documentation, and governance for multi-product teams.</p>
+        </div>
+        <div class="cap-card reveal" data-magnetic>
+          <span class="cap-icon">⬢</span>
+          <h3>Technical Direction</h3>
+          <p>Architecture reviews, performance audits, and creative tech strategy for launches that land.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROCESS -->
+    <section class="section process">
+      <div class="section-head">
+        <p class="eyebrow reveal">Process</p>
+        <h2 class="section-title reveal">How the work<br /><em>gets done</em></h2>
+      </div>
+      <ol class="process-list">
+        <li class="process-item reveal">
+          <span class="process-step">01</span>
+          <div>
+            <h3>Discover</h3>
+            <p>Deep dive into goals, users, constraints, and competitive landscape. No assumptions left unchallenged.</p>
+          </div>
+        </li>
+        <li class="process-item reveal">
+          <span class="process-step">02</span>
+          <div>
+            <h3>Define</h3>
+            <p>Strategy, information architecture, and a sharp creative north star. Alignment before pixels.</p>
+          </div>
+        </li>
+        <li class="process-item reveal">
+          <span class="process-step">03</span>
+          <div>
+            <h3>Design &amp; Build</h3>
+            <p>Iterative design paired with production-ready engineering. Design and code in lockstep.</p>
+          </div>
+        </li>
+        <li class="process-item reveal">
+          <span class="process-step">04</span>
+          <div>
+            <h3>Deliver &amp; Refine</h3>
+            <p>Ship, measure, polish. Handoff that teams can own — or continued partnership for velocity.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="section contact" id="contact">
+      <div class="contact-panel reveal">
+        <div class="contact-copy">
+          <p class="eyebrow">Let's build</p>
+          <h2 class="contact-title">
+            Ready to go<br /><em>performante?</em>
+          </h2>
+          <p class="contact-lede">
+            Tell me about the product, brand, or experience you're building.
+            Serious inquiries only — ambitious preferred.
+          </p>
+        </div>
+        <div class="contact-actions">
+          <a href="mailto:hello@jdeperformante.com" class="btn btn-primary btn-lg" data-magnetic>
+            <span>hello@jdeperformante.com</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+          <div class="socials">
+            <a href="https://github.com/enerjadez" target="_blank" rel="noopener noreferrer" data-magnetic>GitHub</a>
+            <a href="https://x.com" target="_blank" rel="noopener noreferrer" data-magnetic>X / Twitter</a>
+            <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" data-magnetic>LinkedIn</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="logo-mark">JDE</span>
+        <span class="logo-sub">Performante</span>
+      </div>
+      <p class="footer-copy">© <span id="year"></span> JDE Performante. All rights reserved.</p>
+      <a href="#top" class="footer-top" data-magnetic>Back to top ↑</a>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

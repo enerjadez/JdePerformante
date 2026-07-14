@@ -9,28 +9,37 @@
   const isFine = window.matchMedia("(pointer: fine)").matches;
   const isCoarse = window.matchMedia("(pointer: coarse)").matches;
   const isNarrow = window.matchMedia("(max-width: 768px)").matches;
-  // Lite = fewer draw ops, NOT lower FPS — still target display refresh (60/120)
-  const perfLite = reduceMotion || isCoarse || isNarrow;
+  // Mobile only — do not couple reduceMotion into canvas quality (breaks desktop)
+  const isMobile = isCoarse || isNarrow;
+  const perfLite = isMobile;
   const sessionStart = performance.now();
 
   if (perfLite) document.documentElement.classList.add("perf-lite");
 
-  // Retina: 1.5 mobile, up to 2 desktop — sharp without crushing FPS
-  const maxDpr = Math.min(
-    window.devicePixelRatio || 1,
-    perfLite ? 1.5 : 2
-  );
+  // Failsafe: ensure hero type is visible even if CSS intro stalls
+  setTimeout(() => {
+    document.querySelectorAll(".char").forEach((c) => {
+      c.style.opacity = "1";
+      c.style.transform = "none";
+    });
+    document.querySelectorAll(".hero-lede, .hero-actions").forEach((el) => {
+      el.style.opacity = "1";
+      el.style.transform = "none";
+    });
+  }, 2200);
 
-  // ─── High-FPS runner (uncapped by default = match 60/120Hz display) ─
+  const maxDpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.75 : 2);
+
+  // ─── High-FPS runner (uncapped = match 60/120Hz display) ─
   const runners = [];
 
   function createRunner(el, tick, fps, eager) {
-    // fps: 0/undefined/null → uncapped (RAF = display rate)
     const minDelta = fps > 0 ? 1000 / fps : 0;
     let raf = 0;
-    let visible = false;
+    let visible = !!eager;
     let last = 0;
     let lastDraw = 0;
+    let laidOut = false;
 
     const state = {
       start() {
@@ -64,15 +73,31 @@
 
     runners.push(state);
 
+    // Eager (hero/scope) starts immediately — never die on a zero-size first paint
+    if (eager) state.setVisible(true);
+
     if (el && "IntersectionObserver" in window) {
       const io = new IntersectionObserver(
-        ([entry]) =>
-          state.setVisible(!!entry.isIntersecting && entry.intersectionRatio > 0.01),
-        { rootMargin: "80px 0px", threshold: [0, 0.01, 0.1] }
+        ([entry]) => {
+          const rect = entry.boundingClientRect;
+          // Skip pre-layout zero-size callbacks (common on desktop)
+          if (rect.width < 4 || rect.height < 4) return;
+          laidOut = true;
+          state.setVisible(!!entry.isIntersecting);
+        },
+        { rootMargin: "120px 0px", threshold: 0 }
       );
-      io.observe(el);
-      if (eager) state.setVisible(true);
-    } else {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          try {
+            io.observe(el);
+          } catch (_) {
+            state.setVisible(true);
+          }
+          if (eager && !laidOut) state.setVisible(true);
+        });
+      });
+    } else if (!eager) {
       state.setVisible(true);
     }
     return state;
@@ -232,9 +257,16 @@
           io.unobserve(e.target);
         }
       },
-      { threshold: 0.06, rootMargin: "0px 0px -12px 0px" }
+      { threshold: 0.01, rootMargin: "40px 0px" }
     );
     io.observe(el);
+  });
+  // Paint anything already on screen without waiting
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".reveal").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) el.classList.add("visible");
+    });
   });
 
   // ─── Ticker ─────────────────────────────────────────────
@@ -348,15 +380,17 @@
   });
 
   // ═══════════════════════════════════════════════════════
-  // HERO field — uncapped FPS
+  // HERO field — uncapped FPS, dense mesh on mobile + desktop
   // ═══════════════════════════════════════════════════════
   function initHeroField() {
     const canvas = document.getElementById("field");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
+    // desynchronized removed — can blank/freeze canvas on some desktop GPUs
+    const ctx = canvas.getContext("2d", { alpha: true });
     const hudCoords = document.getElementById("hudCoords");
     const hudFps = document.getElementById("hudFps");
     const hudNodes = document.getElementById("hudNodes");
+    const hero = canvas.parentElement;
 
     let w = 0,
       h = 0,
@@ -371,34 +405,45 @@
       let y = Math.random() * h;
       if (edge === "right") x = w + 8;
       if (edge === "left") x = -8;
+      // Mobile: slightly slower drift so neighbors stay linkable longer
+      const speed = isMobile ? 0.28 : 0.42;
       return {
         x,
         y,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
-        r: Math.random() * 1.4 + 0.5,
+        vx: (Math.random() - 0.5) * speed,
+        vy: (Math.random() - 0.5) * speed,
+        r: Math.random() * (isMobile ? 1.8 : 1.5) + (isMobile ? 0.7 : 0.5),
         pulse: Math.random() * Math.PI * 2,
       };
     };
 
     const resize = () => {
       dpr = maxDpr;
-      w = canvas.clientWidth || window.innerWidth;
-      h = canvas.clientHeight || window.innerHeight;
+      // Size from hero section — canvas is position:absolute and may report 0 early
+      w = (hero && hero.clientWidth) || canvas.clientWidth || window.innerWidth;
+      h = (hero && hero.clientHeight) || canvas.clientHeight || window.innerHeight;
+      if (w < 2 || h < 2) {
+        w = window.innerWidth;
+        h = window.innerHeight;
+      }
       canvas.width = (w * dpr) | 0;
       canvas.height = (h * dpr) | 0;
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const density = perfLite ? 6000 : 2800;
-      const minN = perfLite ? 90 : 180;
-      const maxN = perfLite ? 160 : 380;
+      // Dense field on both — mobile uses long-range links instead of skipping pairs
+      const density = isMobile ? 4800 : 2800;
+      const minN = isMobile ? 110 : 180;
+      const maxN = isMobile ? 200 : 360;
       const count = Math.max(minN, Math.min(maxN, ((w * h) / density) | 0));
       nodes = Array.from({ length: count }, () => spawn());
       if (hudNodes) hudNodes.textContent = `NODES ${nodes.length}`;
     };
     onResize(resize);
     resize();
+    // Second layout pass after fonts/boot
+    requestAnimationFrame(() => requestAnimationFrame(resize));
 
-    const hero = canvas.parentElement;
     if (isFine) {
       hero?.addEventListener(
         "mousemove",
@@ -415,7 +460,7 @@
       );
       hero?.addEventListener("mouseleave", () => (pointer.active = false), { passive: true });
     }
-    let touchClear = 0;
+    // Continuous touch influence while finger is down
     hero?.addEventListener(
       "touchstart",
       (e) => {
@@ -425,8 +470,24 @@
         pointer.x = t.clientX - rect.left;
         pointer.y = t.clientY - rect.top;
         pointer.active = true;
-        clearTimeout(touchClear);
-        touchClear = setTimeout(() => (pointer.active = false), 500);
+      },
+      { passive: true }
+    );
+    hero?.addEventListener(
+      "touchmove",
+      (e) => {
+        const t = e.touches[0];
+        if (!t || !pointer.active) return;
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = t.clientX - rect.left;
+        pointer.y = t.clientY - rect.top;
+      },
+      { passive: true }
+    );
+    hero?.addEventListener(
+      "touchend",
+      () => {
+        pointer.active = false;
       },
       { passive: true }
     );
@@ -434,6 +495,11 @@
     createRunner(
       canvas,
       (now, dt) => {
+        if (w < 2 || h < 2) {
+          resize();
+          return;
+        }
+
         frames++;
         if (now - fpsT > 400) {
           if (hudFps) hudFps.textContent = `${Math.round((frames * 1000) / (now - fpsT))} FPS`;
@@ -443,70 +509,121 @@
 
         ctx.clearRect(0, 0, w, h);
 
-        if (pointer.active && !perfLite) {
-          const g = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 160);
-          g.addColorStop(0, "rgba(225,6,0,0.1)");
+        if (pointer.active) {
+          const g = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, isMobile ? 200 : 160);
+          g.addColorStop(0, "rgba(225,6,0,0.12)");
           g.addColorStop(1, "transparent");
           ctx.fillStyle = g;
           ctx.fillRect(0, 0, w, h);
         }
 
         const nLen = nodes.length;
+        const attractR = isMobile ? 200 : 170;
+
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
           if (pointer.active) {
             const dx = pointer.x - n.x;
             const dy = pointer.y - n.y;
             const dist = Math.hypot(dx, dy) || 1;
-            if (dist < 170) {
-              const f = (1 - dist / 170) * 0.09;
+            if (dist < attractR) {
+              const f = (1 - dist / attractR) * (isMobile ? 0.12 : 0.09);
               n.vx += (dx / dist) * f * dt;
               n.vy += (dy / dist) * f * dt;
             }
           }
+          // Soft center drift on mobile keeps density in the mesh zone
+          if (isMobile) {
+            n.vx += (w * 0.5 - n.x) * 0.00008 * dt;
+            n.vy += (h * 0.45 - n.y) * 0.00008 * dt;
+          }
           n.vx *= 0.99;
           n.vy *= 0.99;
-          n.x += n.vx * dt * 1.25;
-          n.y += n.vy * dt * 1.25;
+          n.x += n.vx * dt * 1.2;
+          n.y += n.vy * dt * 1.2;
           n.pulse += 0.035 * dt;
-          if (n.x < -20 || n.x > w + 20 || n.y < -20 || n.y > h + 20) {
-            Object.assign(n, spawn(Math.random() > 0.5 ? "left" : "right"));
-          }
+          // Soft wrap instead of despawn — denser continuous field
+          if (n.x < -10) n.x = w + 10;
+          else if (n.x > w + 10) n.x = -10;
+          if (n.y < -10) n.y = h + 10;
+          else if (n.y > h + 10) n.y = -10;
         }
 
-        const linkDist = perfLite ? 85 : 130;
+        // Link range: mobile gets LONG reach so the web looks full
+        const linkDist = isMobile
+          ? Math.max(150, Math.min(w, h) * 0.32)
+          : Math.max(120, Math.min(w, h) * 0.15);
         const lim = linkDist * linkDist;
-        const stepJ = perfLite ? 2 : 1;
-        ctx.lineWidth = 0.6;
+        // Spatial hash — full neighbor links without O(n²) freeze
+        const cell = linkDist;
+        const grid = new Map();
+        const key = (cx, cy) => cx + "," + cy;
+        for (let i = 0; i < nLen; i++) {
+          const n = nodes[i];
+          const cx = (n.x / cell) | 0;
+          const cy = (n.y / cell) | 0;
+          const k = key(cx, cy);
+          let bucket = grid.get(k);
+          if (!bucket) {
+            bucket = [];
+            grid.set(k, bucket);
+          }
+          bucket.push(i);
+        }
+
+        const lineBoost = isMobile ? 0.72 : 0.55;
+        const alphaBoost = isMobile ? 0.5 : 0.34;
+        ctx.lineWidth = isMobile ? 0.85 : 0.65;
+        ctx.lineCap = "round";
+
         for (let i = 0; i < nLen; i++) {
           const a = nodes[i];
-          for (let j = i + 1; j < nLen; j += stepJ) {
-            const b = nodes[j];
-            const dx = a.x - b.x;
-            const dy = a.y - b.y;
-            const d2 = dx * dx + dy * dy;
-            if (d2 < lim) {
-              const alpha = (1 - Math.sqrt(d2) / linkDist) * 0.32;
-              ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.55})`;
-              ctx.beginPath();
-              ctx.moveTo(a.x, a.y);
-              ctx.lineTo(b.x, b.y);
-              ctx.stroke();
+          const cx = (a.x / cell) | 0;
+          const cy = (a.y / cell) | 0;
+          for (let ox = -1; ox <= 1; ox++) {
+            for (let oy = -1; oy <= 1; oy++) {
+              const bucket = grid.get(key(cx + ox, cy + oy));
+              if (!bucket) continue;
+              for (let bi = 0; bi < bucket.length; bi++) {
+                const j = bucket[bi];
+                if (j <= i) continue;
+                const b = nodes[j];
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                const d2 = dx * dx + dy * dy;
+                if (d2 >= lim || d2 < 0.5) continue;
+                const d = Math.sqrt(d2);
+                const alpha = (1 - d / linkDist) * alphaBoost;
+                // Mild spring so nearby nodes stay linked on mobile
+                if (isMobile && d > linkDist * 0.35) {
+                  const pull = 0.00035 * (d - linkDist * 0.35) * dt;
+                  const inv = 1 / d;
+                  a.vx -= dx * inv * pull;
+                  a.vy -= dy * inv * pull;
+                  b.vx += dx * inv * pull;
+                  b.vy += dy * inv * pull;
+                }
+                ctx.strokeStyle = `rgba(255,255,255,${alpha * lineBoost})`;
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+              }
             }
           }
         }
 
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
-          const glow = 0.45 + Math.sin(n.pulse) * 0.22;
-          const near = pointer.active && Math.hypot(n.x - pointer.x, n.y - pointer.y) < 80;
+          const glow = 0.5 + Math.sin(n.pulse) * 0.25;
+          const near = pointer.active && Math.hypot(n.x - pointer.x, n.y - pointer.y) < 90;
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.r * (near ? 1.5 : 1), 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, n.r * (near ? 1.6 : 1), 0, Math.PI * 2);
           ctx.fillStyle = near ? `rgba(225,6,0,${glow})` : `${WHITE}${glow})`;
           ctx.fill();
         }
       },
-      0, // uncapped → 60/120Hz
+      0,
       true
     );
   }
@@ -519,7 +636,7 @@
     const hzEl = document.getElementById("scopeHz");
     const modeLabel = document.getElementById("scopeModeLabel");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+    const ctx = canvas.getContext("2d", { alpha: false, });
 
     let w = 0,
       h = 80;
@@ -648,7 +765,7 @@
   function initVectors() {
     const canvas = document.getElementById("vectors");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+    const ctx = canvas.getContext("2d", { alpha: false, });
     let w = 0,
       h = 0;
     let ptr = { x: 0, y: 0, on: false };
@@ -761,7 +878,7 @@
   function initWireframe() {
     const canvas = document.getElementById("wireframe");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+    const ctx = canvas.getContext("2d", { alpha: false, });
     let w = 0,
       h = 0,
       rotX = 0.4,
@@ -909,7 +1026,7 @@
   function initLattice() {
     const canvas = document.getElementById("lattice");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+    const ctx = canvas.getContext("2d", { alpha: false, });
     let w = 0,
       h = 0,
       rotX = 0.5,
@@ -1021,7 +1138,7 @@
   function initDNA() {
     const canvas = document.getElementById("dna");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+    const ctx = canvas.getContext("2d", { alpha: false, });
     let w = 0,
       h = 0;
     let rotY = 0.4;
@@ -1205,7 +1322,7 @@
     const sessionEl = document.getElementById("sessionTime");
     const renderEl = document.getElementById("renderPath");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
+    const ctx = canvas.getContext("2d", { alpha: true, });
     const size = 280;
     let lastFrame = performance.now();
     const dpr = maxDpr;

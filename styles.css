@@ -1714,14 +1714,10 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-  .reveal { opacity: 1; transform: none; }
-  .char { opacity: 1; transform: none; }
-  .hero-lede, .hero-actions { opacity: 1; animation: none; }
+  /* Keep site usable — do not nuke all motion (Windows often enables this OS-wide) */
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .char { opacity: 1; transform: none; animation: none; }
+  .hero-lede, .hero-actions { opacity: 1; transform: none; animation: none; }
   .boot { display: none; }
   .scene-3d, .cube-a, .cube-b, .ring-a, .ring-b, .pyramid {
     animation: none !important;
@@ -1732,6 +1728,7 @@ button {
     transform: none;
     filter: none;
   }
+  .word-slide { animation: none !important; }
 }
 
 /* Ultra-narrow safety */
@@ -1782,11 +1779,14 @@ button {
   cursor: auto;
 }
 
-/* Prefer compositing over paint thrash on touch scroll */
-.perf-lite .hero-canvas,
+/* Avoid contain:strict on hero — it can zero-size/break canvas paint on some browsers */
 .perf-lite .lab-canvas,
 .perf-lite .scope-canvas {
-  contain: strict;
+  contain: paint;
+}
+
+.perf-lite .hero-canvas {
+  contain: none;
 }
 
 @media (pointer: coarse) {

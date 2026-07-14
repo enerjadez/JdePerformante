@@ -15,6 +15,7 @@
   --text-dim: rgba(245, 245, 245, 0.32);
   --red: #e10600;
   --red-hot: #ff2a20;
+  --red-blood: #e10600; /* JDE E — strong blood / brand red on black */
   --red-dim: rgba(225, 6, 0, 0.18);
   --red-glow: rgba(225, 6, 0, 0.45);
   --white: #ffffff;
@@ -735,19 +736,56 @@ html.is-hero-painting body {
 
 .char:nth-child(1) { animation-delay: 0.85s; }
 .char:nth-child(2) { animation-delay: 0.95s; }
-/* JDE "E" — deep blood red */
 .char:nth-child(3),
+.char.char-e,
 .char[data-char="E"] {
   animation-delay: 1.05s;
-  color: #6b0000 !important;
-  -webkit-text-fill-color: #6b0000 !important;
-  text-shadow: none; /* shadow was muddying the red on mobile compositors */
+}
+
+/*
+  JDE "E" — strong blood red (#e10600).
+  #6b0000 was too dark on pure black (looked brown/black on mobile OLEDs).
+  Lock fill + color so Safari/compositors can't wash it out.
+*/
+.char.char-e,
+.char[data-char="E"] {
+  color: var(--red-blood) !important;
+  -webkit-text-fill-color: var(--red-blood) !important;
+  text-fill-color: var(--red-blood) !important;
+  text-shadow: none !important;
+  filter: none !important;
+  opacity: 1; /* base; animation still fades in via charIn */
+  mix-blend-mode: normal !important;
 }
 
 @keyframes charIn {
+  from {
+    transform: translateY(110%) rotateX(-40deg);
+    opacity: 0;
+  }
   to {
     transform: translateY(0) rotateX(0);
     opacity: 1;
+  }
+}
+
+/* After intro, keep E fully opaque and red */
+.char.char-e {
+  animation-name: charInE;
+}
+
+@keyframes charInE {
+  from {
+    transform: translateY(110%) rotateX(-40deg);
+    opacity: 0;
+    color: var(--red-blood);
+    -webkit-text-fill-color: var(--red-blood);
+  }
+  to {
+    transform: translateY(0) rotateX(0);
+    opacity: 1;
+    color: var(--red-blood);
+    -webkit-text-fill-color: var(--red-blood);
   }
 }
 

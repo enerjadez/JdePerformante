@@ -180,6 +180,62 @@
     typeStatus.style.transition = "opacity 0.2s";
   }
 
+  // ─── Hero word rotator (no clipping) ────────────────────
+  function initTitleRotator() {
+    const root = document.getElementById("titleRotator");
+    if (!root) return;
+    const words = Array.from(root.querySelectorAll(".rotator-word"));
+    if (words.length < 2) return;
+    let i = 0;
+
+    if (reduceMotion) return;
+
+    setInterval(() => {
+      const current = words[i];
+      const next = words[(i + 1) % words.length];
+      current.classList.remove("is-active");
+      current.classList.add("is-exit");
+      next.classList.add("is-active");
+      next.classList.remove("is-exit");
+
+      setTimeout(() => {
+        current.classList.remove("is-exit");
+      }, 560);
+
+      i = (i + 1) % words.length;
+    }, 3200);
+  }
+
+  // ─── 3D scene pointer parallax ──────────────────────────
+  function initScene3d() {
+    const stage = document.querySelector(".hero-3d");
+    if (!stage || reduceMotion || !isFine) return;
+
+    let tx = 0;
+    let ty = 0;
+    let cx = 0;
+    let cy = 0;
+
+    window.addEventListener(
+      "mousemove",
+      (e) => {
+        const nx = (e.clientX / window.innerWidth - 0.5) * 2;
+        const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+        tx = ny * -14;
+        ty = nx * 20;
+      },
+      { passive: true }
+    );
+
+    (function loop() {
+      cx += (tx - cx) * 0.06;
+      cy += (ty - cy) * 0.06;
+      stage.style.setProperty("--par-x", cx.toFixed(2) + "deg");
+      stage.style.setProperty("--par-y", cy.toFixed(2) + "deg");
+      requestAnimationFrame(loop);
+    })();
+  }
+
   // ─── Count metrics ──────────────────────────────────────
   document.querySelectorAll("[data-count]").forEach((el) => {
     const target = parseInt(el.getAttribute("data-count"), 10) || 0;
@@ -602,7 +658,7 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  // Wireframe polyhedron
+  // Wireframe polyhedron (3D with depth-sorted faces)
   // ═══════════════════════════════════════════════════════
   function initWireframe() {
     const canvas = document.getElementById("wireframe");
@@ -615,7 +671,6 @@
     let auto = true;
     let targetRot = { x: 0.4, y: 0.3 };
 
-    // Icosahedron-ish vertices (scaled)
     const φ = (1 + Math.sqrt(5)) / 2;
     const raw = [
       [-1, φ, 0],
@@ -646,6 +701,31 @@
       }
     }
 
+    // Approximate triangular faces from near triples
+    const faces = [];
+    for (let i = 0; i < verts.length; i++) {
+      for (let j = i + 1; j < verts.length; j++) {
+        for (let k = j + 1; k < verts.length; k++) {
+          const dij = Math.hypot(
+            verts[i][0] - verts[j][0],
+            verts[i][1] - verts[j][1],
+            verts[i][2] - verts[j][2]
+          );
+          const djk = Math.hypot(
+            verts[j][0] - verts[k][0],
+            verts[j][1] - verts[k][1],
+            verts[j][2] - verts[k][2]
+          );
+          const dik = Math.hypot(
+            verts[i][0] - verts[k][0],
+            verts[i][1] - verts[k][1],
+            verts[i][2] - verts[k][2]
+          );
+          if (dij < 1.1 && djk < 1.1 && dik < 1.1) faces.push([i, j, k]);
+        }
+      }
+    }
+
     const resize = () => {
       const dpr = Math.min(devicePixelRatio || 1, 2);
       const rect = canvas.getBoundingClientRect();
@@ -658,28 +738,39 @@
     new ResizeObserver(resize).observe(canvas);
     resize();
 
-    canvas.addEventListener("mousemove", (e) => {
+    const setTarget = (clientX, clientY) => {
       const r = canvas.getBoundingClientRect();
-      const nx = (e.clientX - r.left) / r.width - 0.5;
-      const ny = (e.clientY - r.top) / r.height - 0.5;
+      const nx = (clientX - r.left) / r.width - 0.5;
+      const ny = (clientY - r.top) / r.height - 0.5;
       targetRot.y = nx * Math.PI;
       targetRot.x = ny * Math.PI;
       auto = false;
-    });
-    canvas.addEventListener("mouseleave", () => (auto = true));
+    };
 
-    function project(v) {
+    canvas.addEventListener("mousemove", (e) => setTarget(e.clientX, e.clientY));
+    canvas.addEventListener("mouseleave", () => (auto = true));
+    canvas.addEventListener(
+      "touchmove",
+      (e) => {
+        const t = e.touches[0];
+        if (t) setTarget(t.clientX, t.clientY);
+      },
+      { passive: true }
+    );
+
+    function rotatePoint(v) {
       let [x, y, z] = v;
-      // rot X
       let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
       let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
       y = y1;
       z = z1;
-      // rot Y
       let x1 = x * Math.cos(rotY) + z * Math.sin(rotY);
       z1 = -x * Math.sin(rotY) + z * Math.cos(rotY);
-      x = x1;
-      z = z1;
+      return [x1, y, z1];
+    }
+
+    function project(v) {
+      const [x, y, z] = rotatePoint(v);
       const fov = 2.8;
       const s = (Math.min(w, h) * 0.32) / (fov + z);
       return { x: w / 2 + x * s, y: h / 2 + y * s, z };
@@ -687,8 +778,8 @@
 
     function draw() {
       if (auto) {
-        rotY += 0.008;
-        rotX += 0.003;
+        rotY += 0.01;
+        rotX += 0.004;
       } else {
         rotX += (targetRot.x - rotX) * 0.08;
         rotY += (targetRot.y - rotY) * 0.08;
@@ -697,7 +788,6 @@
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, w, h);
 
-      // Axis guides
       ctx.strokeStyle = "rgba(255,255,255,0.04)";
       ctx.beginPath();
       ctx.moveTo(w / 2, 20);
@@ -707,6 +797,25 @@
       ctx.stroke();
 
       const projected = verts.map(project);
+
+      // Depth-sorted faces
+      const faceData = faces.map((f) => {
+        const pts = f.map((i) => projected[i]);
+        const z = (pts[0].z + pts[1].z + pts[2].z) / 3;
+        return { pts, z };
+      });
+      faceData.sort((a, b) => b.z - a.z);
+
+      for (const { pts, z } of faceData) {
+        const alpha = 0.04 + Math.max(0, 0.12 - z * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.lineTo(pts[1].x, pts[1].y);
+        ctx.lineTo(pts[2].x, pts[2].y);
+        ctx.closePath();
+        ctx.fillStyle = z < 0.1 ? `rgba(225,6,0,${alpha * 1.6})` : `rgba(255,255,255,${alpha})`;
+        ctx.fill();
+      }
 
       for (const [i, j] of edges) {
         const a = projected[i];
@@ -726,6 +835,126 @@
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.z < 0.15 ? 2.5 : 1.5, 0, Math.PI * 2);
         ctx.fillStyle = p.z < 0.15 ? RED : "rgba(255,255,255,0.8)";
+        ctx.fill();
+      }
+
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // 3D Lattice point cloud
+  // ═══════════════════════════════════════════════════════
+  function initLattice() {
+    const canvas = document.getElementById("lattice");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    let w = 0;
+    let h = 0;
+    let rotX = 0.5;
+    let rotY = 0.3;
+    let auto = true;
+    let target = { x: 0.5, y: 0.3 };
+
+    const N = 5;
+    const points = [];
+    for (let x = 0; x < N; x++) {
+      for (let y = 0; y < N; y++) {
+        for (let z = 0; z < N; z++) {
+          points.push({
+            x: (x / (N - 1) - 0.5) * 2,
+            y: (y / (N - 1) - 0.5) * 2,
+            z: (z / (N - 1) - 0.5) * 2,
+          });
+        }
+      }
+    }
+
+    const resize = () => {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      w = rect.width;
+      h = rect.height || 260;
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    new ResizeObserver(resize).observe(canvas);
+    resize();
+
+    const aim = (cx, cy) => {
+      const r = canvas.getBoundingClientRect();
+      target.y = ((cx - r.left) / r.width - 0.5) * Math.PI * 1.2;
+      target.x = ((cy - r.top) / r.height - 0.5) * Math.PI * 0.9;
+      auto = false;
+    };
+    canvas.addEventListener("mousemove", (e) => aim(e.clientX, e.clientY));
+    canvas.addEventListener("mouseleave", () => (auto = true));
+    canvas.addEventListener(
+      "touchmove",
+      (e) => {
+        const t = e.touches[0];
+        if (t) aim(t.clientX, t.clientY);
+      },
+      { passive: true }
+    );
+
+    function project(p) {
+      let { x, y, z } = p;
+      let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
+      let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
+      y = y1;
+      z = z1;
+      let x1 = x * Math.cos(rotY) + z * Math.sin(rotY);
+      z1 = -x * Math.sin(rotY) + z * Math.cos(rotY);
+      x = x1;
+      z = z1;
+      const fov = 3.2;
+      const s = (Math.min(w, h) * 0.38) / (fov + z);
+      return { x: w / 2 + x * s, y: h / 2 + y * s, z, s };
+    }
+
+    function draw() {
+      if (auto) {
+        rotY += 0.007;
+        rotX = 0.45 + Math.sin(performance.now() * 0.0004) * 0.2;
+      } else {
+        rotX += (target.x - rotX) * 0.07;
+        rotY += (target.y - rotY) * 0.07;
+      }
+
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, w, h);
+
+      const projected = points.map(project).sort((a, b) => b.z - a.z);
+
+      // Connect near neighbors in screen space for lattice feel
+      for (let i = 0; i < projected.length; i++) {
+        for (let j = i + 1; j < projected.length; j++) {
+          const a = projected[i];
+          const b = projected[j];
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < 38) {
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            const depth = (a.z + b.z) / 2;
+            ctx.strokeStyle =
+              depth < 0
+                ? `rgba(225,6,0,${0.15 + (1 - d / 38) * 0.35})`
+                : `rgba(255,255,255,${0.04 + (1 - d / 38) * 0.12})`;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (const p of projected) {
+        const r = Math.max(1.2, 3.2 - p.z * 1.2);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = p.z < 0 ? RED : "rgba(255,255,255,0.85)";
         ctx.fill();
       }
 
@@ -873,11 +1102,15 @@
   }
 
   // ─── Start ──────────────────────────────────────────────
+  initTitleRotator();
+  initScene3d();
+
   runBoot().then(() => {
     initHeroField();
     initScope();
     initVectors();
     initWireframe();
+    initLattice();
     initTypeMachine();
     initChrono();
   });

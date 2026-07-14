@@ -72,24 +72,51 @@
         </div>
       </div>
 
+      <!-- Floating 3D stage -->
+      <div class="hero-3d" aria-hidden="true">
+        <div class="scene-3d" id="scene3d">
+          <div class="cube cube-a">
+            <div class="face f-front"></div>
+            <div class="face f-back"></div>
+            <div class="face f-right"></div>
+            <div class="face f-left"></div>
+            <div class="face f-top"></div>
+            <div class="face f-bottom"></div>
+          </div>
+          <div class="ring ring-a"></div>
+          <div class="ring ring-b"></div>
+          <div class="cube cube-b">
+            <div class="face f-front"></div>
+            <div class="face f-back"></div>
+            <div class="face f-right"></div>
+            <div class="face f-left"></div>
+            <div class="face f-top"></div>
+            <div class="face f-bottom"></div>
+          </div>
+          <div class="pyramid" id="pyramid">
+            <div class="pyr-face pyr-1"></div>
+            <div class="pyr-face pyr-2"></div>
+            <div class="pyr-face pyr-3"></div>
+            <div class="pyr-face pyr-4"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="hero-content">
         <p class="eyebrow">
           <span class="pulse"></span>
           <span class="typewriter" id="typeStatus">SYSTEM ARMED</span>
         </p>
         <h1 class="hero-title" id="heroTitle" aria-label="JDE Performante">
-          <span class="title-row">
+          <span class="title-row title-row--mark">
             <span class="char" data-char="J">J</span>
             <span class="char" data-char="D">D</span>
             <span class="char" data-char="E">E</span>
           </span>
-          <span class="title-row title-row--serif">
-            <span class="word-slide" id="wordSlide">
-              <span>Performante</span>
-              <span>Engineered</span>
-              <span>Inevitable</span>
-              <span>Performante</span>
-            </span>
+          <span class="title-rotator" id="titleRotator" aria-live="polite">
+            <span class="rotator-word is-active">Performante</span>
+            <span class="rotator-word">Engineered</span>
+            <span class="rotator-word">Inevitable</span>
           </span>
         </h1>
         <p class="hero-lede">
@@ -156,12 +183,23 @@
             <span class="lab-title">Solid Geometry</span>
             <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
           </div>
-          <canvas id="wireframe" class="lab-canvas" aria-label="Rotating wireframe polyhedron"></canvas>
-          <p class="lab-caption">Perspective-projected polyhedron. Real rotation matrix, no libraries.</p>
+          <canvas id="wireframe" class="lab-canvas" aria-label="Rotating 3D polyhedron"></canvas>
+          <p class="lab-caption">Perspective-projected polyhedron with depth-sorted faces. Pure math, no libraries.</p>
+        </article>
+
+        <!-- Module: 3D lattice -->
+        <article class="lab-card reveal">
+          <div class="lab-header">
+            <span class="mono">MOD · 02B</span>
+            <span class="lab-title">3D Lattice</span>
+            <span class="lab-status"><span class="dot-live"></span> ACTIVE</span>
+          </div>
+          <canvas id="lattice" class="lab-canvas" aria-label="Interactive 3D point lattice"></canvas>
+          <p class="lab-caption">3D point cloud with perspective projection. Drag or move to reorient the lattice.</p>
         </article>
 
         <!-- Module: Type machine -->
-        <article class="lab-card reveal">
+        <article class="lab-card lab-card--wide reveal">
           <div class="lab-header">
             <span class="mono">MOD · 03</span>
             <span class="lab-title">Kinetic Type</span>

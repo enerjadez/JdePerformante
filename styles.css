@@ -323,11 +323,11 @@ button {
   pointer-events: none;
 }
 
-/* Paint layer: OFF by default (page stays scrollable). Armed only after red cube gate. */
+/* Paint layer: OFF by default. Below text when idle so type (E) stays true color. */
 .hero-paint {
   position: absolute;
   inset: 0;
-  z-index: 7;
+  z-index: 2;
   pointer-events: none;
   touch-action: none !important;
   cursor: crosshair;
@@ -337,7 +337,9 @@ button {
   background: transparent;
 }
 
+/* Only during an active stroke does paint sit above chrome for free swipe */
 .hero.is-painting .hero-paint {
+  z-index: 8;
   pointer-events: auto;
 }
 
@@ -373,41 +375,17 @@ html.is-hero-painting body {
   cursor: crosshair;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
 }
 
 .hero-gate-ring {
   position: absolute;
-  inset: 8%;
+  inset: 12%;
   border-radius: 50%;
-  border: 1px solid rgba(225, 6, 0, 0.55);
-  box-shadow:
-    0 0 0 1px rgba(225, 6, 0, 0.15),
-    0 0 22px rgba(225, 6, 0, 0.35);
-  animation: gatePulse 2.4s ease-in-out infinite;
+  border: 1px solid rgba(225, 6, 0, 0.4);
+  box-shadow: 0 0 18px rgba(225, 6, 0, 0.25);
+  animation: gatePulse 2.8s ease-in-out infinite;
   pointer-events: none;
-}
-
-.hero-gate-label {
-  position: relative;
-  z-index: 1;
-  font-size: 0.5rem;
-  letter-spacing: 0.16em;
-  color: rgba(255, 255, 255, 0.55);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
-  pointer-events: none;
-  opacity: 0.85;
-}
-
-.hero-gate:hover .hero-gate-label,
-.hero-gate:focus-visible .hero-gate-label,
-.hero.is-painting .hero-gate-label {
-  color: #fff;
-  opacity: 1;
+  opacity: 0.7;
 }
 
 .hero-gate:focus-visible {
@@ -423,18 +401,17 @@ html.is-hero-painting body {
   0%,
   100% {
     transform: scale(1);
-    opacity: 0.75;
+    opacity: 0.55;
   }
   50% {
-    transform: scale(1.08);
-    opacity: 1;
+    transform: scale(1.06);
+    opacity: 0.9;
   }
 }
 
 .hero.is-painting .hero-gate-ring {
   animation: none;
-  border-color: var(--red);
-  box-shadow: 0 0 30px rgba(225, 6, 0, 0.7);
+  opacity: 0.35;
 }
 
 .hero-vignette {
@@ -674,15 +651,16 @@ html.is-hero-painting body {
 .hud-readout.left { left: 1.5rem; }
 .hud-readout.right { right: 1.5rem; text-align: right; }
 
+/* Content above field/paint when idle — preserves true type color (blood-red E) */
 .hero-content {
   position: relative;
-  z-index: 5;
+  z-index: 10;
   max-width: min(640px, 100%);
   padding-right: clamp(0rem, 8vw, 2rem);
   pointer-events: none;
+  isolation: isolate; /* own stacking context; no overlay tinting glyphs */
 }
 
-/* CTAs always tappable when not mid-paint */
 .hero-content .hero-actions {
   position: relative;
   z-index: 12;
@@ -692,6 +670,12 @@ html.is-hero-painting body {
 .hero-content .hero-actions a,
 .hero-content .hero-actions button {
   pointer-events: auto;
+}
+
+/* Keep title above decorative chrome */
+.hero-title {
+  position: relative;
+  z-index: 1;
 }
 
 .eyebrow {
@@ -751,16 +735,13 @@ html.is-hero-painting body {
 
 .char:nth-child(1) { animation-delay: 0.85s; }
 .char:nth-child(2) { animation-delay: 0.95s; }
-/* JDE "E" — deep blood red (forced for mobile Safari color cascade) */
+/* JDE "E" — deep blood red */
 .char:nth-child(3),
 .char[data-char="E"] {
   animation-delay: 1.05s;
   color: #6b0000 !important;
   -webkit-text-fill-color: #6b0000 !important;
-  text-shadow:
-    0 0 12px rgba(120, 0, 0, 0.75),
-    0 0 28px rgba(90, 0, 0, 0.45),
-    0 1px 0 #3a0000;
+  text-shadow: none; /* shadow was muddying the red on mobile compositors */
 }
 
 @keyframes charIn {
@@ -897,12 +878,13 @@ html.is-hero-painting body {
     padding-top: calc(var(--nav-h) + 2.5rem);
   }
   .hero-3d {
-    top: 14%;
-    right: 50%;
-    transform: translate(50%, 0) rotateX(var(--par-x)) rotateY(var(--par-y));
-    width: min(52vw, 220px);
-    height: min(52vw, 220px);
-    opacity: 0.95;
+    top: 12%;
+    right: 4%;
+    left: auto;
+    transform: translateY(0) rotateX(var(--par-x)) rotateY(var(--par-y));
+    width: min(38vw, 160px);
+    height: min(38vw, 160px);
+    opacity: 0.9;
     z-index: 11;
     pointer-events: none;
   }
@@ -910,9 +892,6 @@ html.is-hero-painting body {
     width: min(48%, 128px);
     height: min(48%, 128px);
     margin: calc(min(24%, 64px) * -1) 0 0 calc(min(24%, 64px) * -1);
-  }
-  .hero-gate-label {
-    font-size: 0.48rem;
   }
   .hero-content {
     padding-right: 0;
@@ -1295,10 +1274,7 @@ html.is-hero-painting body {
 }
 
 .dial-hint {
-  font-size: 0.52rem;
-  letter-spacing: 0.14em;
-  color: var(--text-dim);
-  text-align: center;
+  display: none; /* no instructional chrome */
 }
 
 @media (max-width: 720px) {

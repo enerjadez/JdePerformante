@@ -17,15 +17,11 @@
   if (perfLite) document.documentElement.classList.add("perf-lite");
 
   // Failsafe: ensure hero type is visible even if CSS intro stalls
+  // Do not set inline colors here — that fought CSS and muddied the blood-red E.
   setTimeout(() => {
     document.querySelectorAll(".char").forEach((c) => {
       c.style.opacity = "1";
       c.style.transform = "none";
-      // Keep blood-red E (inline styles can wash out cascade on mobile)
-      if (c.getAttribute("data-char") === "E") {
-        c.style.color = "#6b0000";
-        c.style.webkitTextFillColor = "#6b0000";
-      }
     });
     document.querySelectorAll(".hero-lede, .hero-actions").forEach((el) => {
       el.style.opacity = "1";
@@ -563,8 +559,8 @@
         canvas.style.height = h + "px";
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const density = 3000;
-      const count = Math.max(140, Math.min(isMobile ? 220 : 340, ((w * h) / density) | 0));
+      const density = 4200;
+      const count = Math.max(90, Math.min(isMobile ? 140 : 220, ((w * h) / density) | 0));
       if (!nodes.length) {
         nodes = Array.from({ length: count }, spawn);
       } else if (Math.abs(nodes.length - count) > 40) {
@@ -1649,9 +1645,6 @@
       }
       ctx.globalAlpha = 1;
 
-      ctx.font = "10px IBM Plex Mono, monospace";
-      ctx.fillStyle = "rgba(245,245,245,0.3)";
-      ctx.fillText(orbit.dragging ? "ROTATING" : "DRAG TO ROTATE", 12, h - 12);
     }, 0);
   }
 

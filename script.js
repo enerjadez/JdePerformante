@@ -636,12 +636,14 @@
     const hzEl = document.getElementById("scopeHz");
     const modeLabel = document.getElementById("scopeModeLabel");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, });
+    const ctx = canvas.getContext("2d", { alpha: false });
 
     let w = 0,
-      h = 80;
-    let t = 0;
-    let waveMode = "sine"; // sine | heartbeat | pulse
+      h = 80,
+      bufW = 0,
+      bufH = 0;
+    let t0 = performance.now();
+    let waveMode = "sine";
     let targetHz = 440;
     let displayHz = 440;
 
@@ -668,59 +670,63 @@
     setMode("sine", 440);
 
     const resize = () => {
-      const dpr = maxDpr;
-      w = canvas.clientWidth || canvas.parentElement?.clientWidth || window.innerWidth;
-      h = perfLite ? 64 : 80;
-      canvas.width = (w * dpr) | 0;
-      canvas.height = (h * dpr) | 0;
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
+      // Integer CSS size + integer buffer — kills subpixel shimmer
+      const cssW = Math.max(
+        1,
+        Math.round(canvas.clientWidth || canvas.parentElement?.clientWidth || window.innerWidth)
+      );
+      const cssH = isMobile ? 64 : 80;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const nextW = Math.max(1, Math.round(cssW * dpr));
+      const nextH = Math.max(1, Math.round(cssH * dpr));
+      if (nextW === bufW && nextH === bufH && w === cssW) return;
+      bufW = nextW;
+      bufH = nextH;
+      w = cssW;
+      h = cssH;
+      canvas.width = bufW;
+      canvas.height = bufH;
+      canvas.style.width = cssW + "px";
+      canvas.style.height = cssH + "px";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
     };
     onResize(resize);
     resize();
 
-    // ECG-style heartbeat sample (normalized -1..1) at phase 0..1 of beat
     function heartbeatY(phase) {
-      // phase 0-1 within one beat cycle
-      const p = phase % 1;
-      // P wave
+      const p = ((phase % 1) + 1) % 1;
       if (p < 0.12) return Math.sin((p / 0.12) * Math.PI) * 0.18;
-      // Q
       if (p < 0.16) return -0.15 * ((p - 0.12) / 0.04);
-      // R spike
       if (p < 0.2) return -0.15 + 1.15 * ((p - 0.16) / 0.04);
-      // S
       if (p < 0.24) return 1.0 - 1.35 * ((p - 0.2) / 0.04);
-      // baseline + T
       if (p < 0.32) return -0.2 * (1 - (p - 0.24) / 0.08);
       if (p < 0.48) return Math.sin(((p - 0.32) / 0.16) * Math.PI) * 0.28;
       return 0;
     }
 
-    function sample(n, time) {
+    function sample(n, time, hz) {
       if (waveMode === "heartbeat") {
-        // targetHz used as BPM-ish (72 default)
-        const bpm = targetHz;
-        const beatsPerSec = bpm / 60;
-        const phase = time * beatsPerSec + n * 0.15;
-        return heartbeatY(phase) * 0.95;
+        const beatsPerSec = hz / 60;
+        return heartbeatY(time * beatsPerSec + n * 0.15) * 0.95;
       }
       if (waveMode === "pulse") {
-        const freq = targetHz / 60; // visual cycles
-        const phase = (time * freq + n * 4) % 1;
-        return phase < 0.12 ? 0.9 : phase < 0.18 ? -0.25 : 0.05 * Math.sin(time * 8 + n * 20);
+        const phase = (time * (hz / 60) + n * 4) % 1;
+        if (phase < 0.12) return 0.9;
+        if (phase < 0.18) return -0.25;
+        return 0;
       }
-      // sine — map Hz to visual spatial frequency
-      const cycles = 2 + (targetHz / 440) * 4;
-      return Math.sin(n * Math.PI * 2 * cycles + time * (2 + targetHz / 200));
+      const cycles = 2 + (hz / 440) * 4;
+      return Math.sin(n * Math.PI * 2 * cycles + time * (2 + hz / 200));
     }
 
     createRunner(
       canvas,
-      (_, dt) => {
-        t += 0.016 * Math.min(dt, 2);
-        displayHz += (targetHz - displayHz) * 0.12;
+      (now) => {
+        if (w < 2) resize();
+        // Clock-stable phase — no dt jitter shimmer
+        const t = (now - t0) * 0.001;
+        displayHz += (targetHz - displayHz) * 0.1;
         if (hzEl) {
           if (waveMode === "heartbeat") hzEl.textContent = `${Math.round(displayHz)} BPM`;
           else if (waveMode === "pulse") hzEl.textContent = `${Math.round(displayHz)} PPM`;
@@ -730,29 +736,31 @@
         ctx.fillStyle = "#070707";
         ctx.fillRect(0, 0, w, h);
 
-        ctx.strokeStyle = "rgba(255,255,255,0.08)";
+        // Pixel-aligned baseline
+        const mid = Math.floor(h / 2) + 0.5;
+        ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(0, h / 2);
-        ctx.lineTo(w, h / 2);
+        ctx.moveTo(0, mid);
+        ctx.lineTo(w, mid);
         ctx.stroke();
 
-        const step = perfLite ? 2 : 1;
-        const amp = h * 0.32;
+        // Dense samples, no shadowBlur (shadow was the main glow glitch)
+        const amp = h * 0.3;
+        const step = 1;
         ctx.beginPath();
         for (let x = 0; x <= w; x += step) {
-          const n = x / w;
-          const y = h / 2 - sample(n, t) * amp;
+          const n = x / Math.max(1, w);
+          const y = mid - sample(n, t, displayHz) * amp;
           if (x === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
         ctx.strokeStyle = waveMode === "heartbeat" ? "#ff4d6d" : RED;
-        ctx.lineWidth = 1.6;
-        if (!perfLite) {
-          ctx.shadowColor = "rgba(225,6,0,0.45)";
-          ctx.shadowBlur = 5;
-        }
-        ctx.stroke();
+        ctx.lineWidth = 1.5;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
         ctx.shadowBlur = 0;
+        ctx.stroke();
       },
       0,
       true
@@ -1138,9 +1146,11 @@
   function initDNA() {
     const canvas = document.getElementById("dna");
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false, });
+    const ctx = canvas.getContext("2d", { alpha: false });
     let w = 0,
-      h = 0;
+      h = 0,
+      bufW = 0,
+      bufH = 0;
     let rotY = 0.4;
     let rotX = 0.25;
     let auto = true;
@@ -1148,31 +1158,49 @@
     let lastPX = 0,
       lastPY = 0;
     let target = { x: 0.25, y: 0.4 };
+    let spinT0 = performance.now();
 
-    const pairs = perfLite ? 18 : 28;
+    const pairs = isMobile ? 20 : 28;
     const radius = 1.0;
     const height = 4.2;
     const twist = Math.PI * 2.4;
 
-    // Base pair colors (A-T / C-G vibe)
     const pairColors = [
-      ["#e10600", "#f5f5f5"],
-      ["#c084fc", "#22c55e"],
-      ["#3b82f6", "#f59e0b"],
-      ["#ff4d6d", "#a3e635"],
+      ["#e10600", "#f0f0f0"],
+      ["#c084fc", "#4ade80"],
+      ["#60a5fa", "#fbbf24"],
+      ["#fb7185", "#a3e635"],
     ];
 
+    // Half-pixel snap reduces crawl/shimmer on rotating lines
+    const snap = (v) => Math.round(v * 2) / 2;
+
     const resize = () => {
-      const dpr = maxDpr;
       const rect = canvas.getBoundingClientRect();
-      w = rect.width;
-      h = rect.height || 280;
-      canvas.width = (w * dpr) | 0;
-      canvas.height = (h * dpr) | 0;
+      const cssW = Math.max(1, Math.round(rect.width));
+      const cssH = Math.max(1, Math.round(rect.height || 280));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const nextW = Math.max(1, Math.round(cssW * dpr));
+      const nextH = Math.max(1, Math.round(cssH * dpr));
+      // Only reallocate when size actually changes (ResizeObserver thrash = flicker)
+      if (nextW === bufW && nextH === bufH && w === cssW && h === cssH) return;
+      bufW = nextW;
+      bufH = nextH;
+      w = cssW;
+      h = cssH;
+      canvas.width = bufW;
+      canvas.height = bufH;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
     };
     onResize(resize);
-    new ResizeObserver(resize).observe(canvas);
+    let roT = 0;
+    new ResizeObserver(() => {
+      clearTimeout(roT);
+      roT = setTimeout(resize, 50);
+    }).observe(canvas);
     resize();
 
     canvas.style.touchAction = "none";
@@ -1201,6 +1229,7 @@
     });
     const endDrag = () => {
       dragging = false;
+      spinT0 = performance.now();
       setTimeout(() => {
         if (!dragging) auto = true;
       }, 900);
@@ -1212,22 +1241,28 @@
     });
 
     function rotProject(x, y, z) {
-      // rot X
       let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
       let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
       y = y1;
       z = z1;
-      // rot Y
       let x1 = x * Math.cos(rotY) + z * Math.sin(rotY);
       z1 = -x * Math.sin(rotY) + z * Math.cos(rotY);
       const s = (Math.min(w, h) * 0.42) / (3.4 + z1);
-      return { x: w / 2 + x1 * s, y: h / 2 + y * s, z: z1 };
+      return {
+        x: snap(w / 2 + x1 * s),
+        y: snap(h / 2 + y * s),
+        z: z1,
+      };
     }
 
-    createRunner(canvas, () => {
+    createRunner(canvas, (now) => {
+      if (w < 2) resize();
+
       if (auto) {
-        rotY += 0.012;
-        rotX = 0.22 + Math.sin(performance.now() * 0.00035) * 0.12;
+        // Time-based spin — stable, no per-frame float crawl from dt noise
+        const elapsed = (now - spinT0) * 0.001;
+        rotY = 0.4 + elapsed * 0.55;
+        rotX = 0.22 + Math.sin(elapsed * 0.45) * 0.1;
       } else if (!dragging) {
         rotX += (target.x - rotX) * 0.06;
         rotY += (target.y - rotY) * 0.06;
@@ -1235,16 +1270,18 @@
 
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
 
-      // Build segments
       const backboneA = [];
       const backboneB = [];
       const rungs = [];
 
       for (let i = 0; i < pairs; i++) {
-        const t = i / (pairs - 1);
-        const angle = t * twist + rotY * 0.15;
-        const y = (t - 0.5) * height;
+        const u = i / (pairs - 1);
+        // Twist only — no extra rotY on angle (that double-rotated and shimmered)
+        const angle = u * twist;
+        const y = (u - 0.5) * height;
         const ax = Math.cos(angle) * radius;
         const az = Math.sin(angle) * radius;
         const bx = Math.cos(angle + Math.PI) * radius;
@@ -1253,61 +1290,55 @@
         const pb = rotProject(bx, y, bz);
         backboneA.push(pa);
         backboneB.push(pb);
-        rungs.push({ a: pa, b: pb, t, colors: pairColors[i % pairColors.length] });
+        rungs.push({ a: pa, b: pb, colors: pairColors[i % pairColors.length], z: (pa.z + pb.z) * 0.5 });
       }
 
-      // Depth-sort rungs
-      rungs.sort((u, v) => (u.a.z + u.b.z) / 2 - (v.a.z + v.b.z) / 2);
+      rungs.sort((u, v) => u.z - v.z);
 
-      // Rungs (base pairs)
-      for (const r of rungs) {
-        const depth = (r.a.z + r.b.z) / 2;
-        const alpha = Math.max(0.3, Math.min(1, 0.4 + (1 - (depth + 1.2) / 2.4) * 0.55));
-        const mx = (r.a.x + r.b.x) / 2;
-        const my = (r.a.y + r.b.y) / 2;
-        const c0 = r.colors[0];
-        const c1 = r.colors[1];
-        ctx.globalAlpha = alpha;
-        ctx.lineWidth = perfLite ? 1.5 : 2.1;
+      // Backbones first (stable solid strokes, no per-vertex alpha)
+      const drawBackbone = (pts, color, width) => {
+        if (pts.length < 2) return;
         ctx.beginPath();
-        ctx.moveTo(r.a.x, r.a.y);
-        ctx.lineTo(mx, my);
-        ctx.strokeStyle = c0;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(mx, my);
-        ctx.lineTo(r.b.x, r.b.y);
-        ctx.strokeStyle = c1;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(r.a.x, r.a.y, 2.3, 0, Math.PI * 2);
-        ctx.fillStyle = c0;
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(r.b.x, r.b.y, 2.3, 0, Math.PI * 2);
-        ctx.fillStyle = c1;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-
-      // Backbone ribbons
-      const drawBackbone = (pts, color) => {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          if (i === 0) ctx.moveTo(pts[i].x, pts[i].y);
-          else ctx.lineTo(pts[i].x, pts[i].y);
-        }
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
         ctx.strokeStyle = color;
-        ctx.lineWidth = perfLite ? 2 : 2.6;
-        ctx.lineJoin = "round";
+        ctx.lineWidth = width;
         ctx.stroke();
       };
-      drawBackbone(backboneA, "rgba(225,6,0,0.85)");
-      drawBackbone(backboneB, "rgba(245,245,245,0.75)");
+      drawBackbone(backboneA, "rgba(225,6,0,0.9)", isMobile ? 2.2 : 2.6);
+      drawBackbone(backboneB, "rgba(240,240,240,0.82)", isMobile ? 2.2 : 2.6);
 
-      // Hint
+      // Rungs — fixed alpha bands instead of globalAlpha thrash
+      for (const r of rungs) {
+        const near = r.z < 0.15;
+        const midX = snap((r.a.x + r.b.x) * 0.5);
+        const midY = snap((r.a.y + r.b.y) * 0.5);
+        ctx.lineWidth = near ? 2.2 : 1.6;
+        ctx.globalAlpha = near ? 1 : 0.72;
+        ctx.beginPath();
+        ctx.moveTo(r.a.x, r.a.y);
+        ctx.lineTo(midX, midY);
+        ctx.strokeStyle = r.colors[0];
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(midX, midY);
+        ctx.lineTo(r.b.x, r.b.y);
+        ctx.strokeStyle = r.colors[1];
+        ctx.stroke();
+        const br = near ? 2.4 : 2;
+        ctx.beginPath();
+        ctx.arc(r.a.x, r.a.y, br, 0, Math.PI * 2);
+        ctx.fillStyle = r.colors[0];
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(r.b.x, r.b.y, br, 0, Math.PI * 2);
+        ctx.fillStyle = r.colors[1];
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
       ctx.font = "10px IBM Plex Mono, monospace";
-      ctx.fillStyle = "rgba(245,245,245,0.28)";
+      ctx.fillStyle = "rgba(245,245,245,0.3)";
       ctx.fillText(dragging ? "ROTATING" : "DRAG TO ROTATE", 12, h - 12);
     }, 0);
   }

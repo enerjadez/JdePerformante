@@ -508,19 +508,17 @@
   });
 
   // ═══════════════════════════════════════════════════════
-  // HERO field — real paint surface (canvas-like finger track)
+  // HERO field — full canvas paint: swipe finger = mesh art
   // ═══════════════════════════════════════════════════════
   function initHeroField() {
     const canvas = document.getElementById("field");
     const paint = document.getElementById("heroPaint");
     const hero = document.getElementById("hero") || canvas?.parentElement;
-    if (!canvas || !hero) return;
+    if (!canvas || !hero || !paint) return;
     const ctx = canvas.getContext("2d", { alpha: true });
     const hudCoords = document.getElementById("hudCoords");
     const hudFps = document.getElementById("hudFps");
     const hudNodes = document.getElementById("hudNodes");
-    // All input goes through the paint layer (or hero fallback)
-    const surface = paint || hero;
 
     let w = 0,
       h = 0,
@@ -529,25 +527,27 @@
     let frames = 0,
       fpsT = 0;
 
-    // Live pointer in field space — updated every move event
-    const ptr = { x: 0, y: 0, active: false, id: null };
-
-    const spawn = (edge) => {
-      let x = Math.random() * w;
-      let y = Math.random() * h;
-      if (edge === "right") x = w + 8;
-      if (edge === "left") x = -8;
-      if (edge === "top") y = -8;
-      if (edge === "bottom") y = h + 8;
-      return {
-        x,
-        y,
-        vx: (Math.random() - 0.5) * 0.35,
-        vy: (Math.random() - 0.5) * 0.35,
-        r: Math.random() * 1.4 + 0.55,
-        pulse: Math.random() * Math.PI * 2,
-      };
+    // Brush state: live tip + fading trail (so swipe paints a path of red mesh)
+    const brush = {
+      x: 0,
+      y: 0,
+      active: false,
+      id: null,
+      painting: false, // true only while finger is down / mouse button down
     };
+    /** @type {{x:number,y:number,life:number}[]} */
+    const trail = [];
+    const TRAIL_MAX = 48;
+    const TRAIL_LIFE = 1;
+
+    const spawn = () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.5 + 0.5,
+      pulse: Math.random() * Math.PI * 2,
+    });
 
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -562,11 +562,10 @@
         canvas.style.height = h + "px";
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const density = 3200;
-      const count = Math.max(120, Math.min(isMobile ? 200 : 320, ((w * h) / density) | 0));
+      const density = 3000;
+      const count = Math.max(140, Math.min(isMobile ? 220 : 340, ((w * h) / density) | 0));
       if (!nodes.length) {
-        nodes = Array.from({ length: count }, () => spawn());
+        nodes = Array.from({ length: count }, spawn);
       } else if (Math.abs(nodes.length - count) > 40) {
         while (nodes.length < count) nodes.push(spawn());
         while (nodes.length > count) nodes.pop();
@@ -577,118 +576,127 @@
     resize();
     requestAnimationFrame(() => requestAnimationFrame(resize));
 
-    // Map client → field coordinates using paint/surface bounds
-    const track = (clientX, clientY) => {
-      const rect = surface.getBoundingClientRect();
-      ptr.x = ((clientX - rect.left) / Math.max(1, rect.width)) * w;
-      ptr.y = ((clientY - rect.top) / Math.max(1, rect.height)) * h;
-      ptr.active = true;
+    const lockScroll = (on) => {
+      hero.classList.toggle("is-painting", on);
+      document.documentElement.classList.toggle("is-hero-painting", on);
+    };
+
+    const toField = (clientX, clientY) => {
+      const rect = paint.getBoundingClientRect();
+      return {
+        x: ((clientX - rect.left) / Math.max(1, rect.width)) * w,
+        y: ((clientY - rect.top) / Math.max(1, rect.height)) * h,
+      };
+    };
+
+    const stamp = (clientX, clientY) => {
+      const p = toField(clientX, clientY);
+      brush.x = p.x;
+      brush.y = p.y;
+      brush.active = true;
+      // Dense trail samples while painting so swipe leaves connected art
+      if (brush.painting) {
+        const last = trail[trail.length - 1];
+        if (!last || Math.hypot(last.x - p.x, last.y - p.y) > 6) {
+          trail.push({ x: p.x, y: p.y, life: TRAIL_LIFE });
+          if (trail.length > TRAIL_MAX) trail.shift();
+        } else {
+          last.x = p.x;
+          last.y = p.y;
+          last.life = TRAIL_LIFE;
+        }
+      }
       if (hudCoords) {
-        hudCoords.textContent = `X ${((ptr.x / w) * 2 - 1).toFixed(3)} · Y ${((ptr.y / h) * 2 - 1).toFixed(3)}`;
+        hudCoords.textContent = `X ${((p.x / w) * 2 - 1).toFixed(3)} · Y ${((p.y / h) * 2 - 1).toFixed(3)}`;
       }
     };
 
-    const release = () => {
-      ptr.active = false;
-      ptr.id = null;
+    const startPaint = (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      brush.painting = true;
+      brush.id = e.pointerId;
+      lockScroll(true);
+      stamp(e.clientX, e.clientY);
+      try {
+        paint.setPointerCapture(e.pointerId);
+      } catch (_) {}
+      if (e.cancelable) e.preventDefault();
+      return false;
     };
 
-    // ── Canvas-style input on paint layer ─────────────────
-    // touch-action:none on .hero-paint + preventDefault = fluid finger paint
-    surface.addEventListener(
-      "pointerdown",
-      (e) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        ptr.id = e.pointerId;
-        track(e.clientX, e.clientY);
-        try {
-          surface.setPointerCapture(e.pointerId);
-        } catch (_) {}
-        // Stop the page from scrolling while painting the field
-        if (e.cancelable) e.preventDefault();
-      },
-      { passive: false }
-    );
+    const movePaint = (e) => {
+      // Mouse hover (not painting): soft follow without trail lock
+      if (e.pointerType === "mouse" && !brush.painting) {
+        stamp(e.clientX, e.clientY);
+        brush.active = true;
+        return;
+      }
+      if (!brush.painting) return;
+      if (brush.id != null && e.pointerId !== brush.id) return;
+      stamp(e.clientX, e.clientY);
+      if (e.cancelable) e.preventDefault();
+      return false;
+    };
 
-    surface.addEventListener(
-      "pointermove",
-      (e) => {
-        // Mouse: hover always paints (desktop feel)
-        if (e.pointerType === "mouse") {
-          track(e.clientX, e.clientY);
-          return;
-        }
-        // Touch / pen: fluid track while this pointer is the active stroke
-        if (ptr.id === e.pointerId) {
-          track(e.clientX, e.clientY);
-          if (e.cancelable) e.preventDefault();
-        }
-      },
-      { passive: false }
-    );
+    const endPaint = (e) => {
+      if (brush.id != null && e.pointerId !== brush.id) return;
+      const wasTouch = e.pointerType !== "mouse";
+      brush.painting = false;
+      brush.id = null;
+      lockScroll(false);
+      // Touch: release active; mouse: keep hover if still over
+      if (wasTouch) brush.active = false;
+      try {
+        paint.releasePointerCapture?.(e.pointerId);
+      } catch (_) {}
+    };
 
-    surface.addEventListener(
-      "pointerup",
-      (e) => {
-        if (ptr.id != null && e.pointerId !== ptr.id) return;
-        // Mouse keeps hover if still over surface; touch releases
-        if (e.pointerType === "mouse") {
-          // stay active if still over — leave handles exit
-          return;
-        }
-        release();
-        try {
-          surface.releasePointerCapture?.(e.pointerId);
-        } catch (_) {}
-      },
-      { passive: true }
-    );
-
-    surface.addEventListener(
-      "pointercancel",
-      (e) => {
-        if (ptr.id != null && e.pointerId !== ptr.id) return;
-        release();
-      },
-      { passive: true }
-    );
-
-    surface.addEventListener(
+    // Primary path: Pointer Events on paint surface
+    paint.addEventListener("pointerdown", startPaint, { passive: false });
+    paint.addEventListener("pointermove", movePaint, { passive: false });
+    paint.addEventListener("pointerup", endPaint, { passive: false });
+    paint.addEventListener("pointercancel", endPaint, { passive: false });
+    paint.addEventListener(
       "pointerleave",
       (e) => {
-        if (e.pointerType === "mouse") release();
+        if (e.pointerType === "mouse" && !brush.painting) brush.active = false;
       },
       { passive: true }
     );
 
-    // Fallback raw touch (some WebViews)
-    surface.addEventListener(
+    // Hard fallback for iOS quirks — raw touch on paint only
+    paint.addEventListener(
       "touchstart",
       (e) => {
         const t = e.touches[0];
         if (!t) return;
-        track(t.clientX, t.clientY);
-        if (e.cancelable) e.preventDefault();
+        brush.painting = true;
+        brush.id = "touch";
+        lockScroll(true);
+        stamp(t.clientX, t.clientY);
+        e.preventDefault();
       },
       { passive: false }
     );
-    surface.addEventListener(
+    paint.addEventListener(
       "touchmove",
       (e) => {
+        if (!brush.painting) return;
         const t = e.touches[0];
         if (!t) return;
-        track(t.clientX, t.clientY);
-        if (e.cancelable) e.preventDefault();
+        stamp(t.clientX, t.clientY);
+        e.preventDefault();
       },
       { passive: false }
     );
-    surface.addEventListener(
-      "touchend",
-      () => {
-        release();
-      },
-      { passive: true }
-    );
+    const touchEnd = () => {
+      brush.painting = false;
+      brush.id = null;
+      brush.active = false;
+      lockScroll(false);
+    };
+    paint.addEventListener("touchend", touchEnd, { passive: false });
+    paint.addEventListener("touchcancel", touchEnd, { passive: false });
 
     createRunner(
       canvas,
@@ -697,8 +705,6 @@
           resize();
           return;
         }
-
-        // Clamp dt so a tab-switch / jank frame never flings nodes into a clump
         const step = Math.min(dt, 1.5);
 
         frames++;
@@ -710,68 +716,100 @@
 
         ctx.clearRect(0, 0, w, h);
 
+        // Fade brush trail
+        for (let i = trail.length - 1; i >= 0; i--) {
+          trail[i].life -= 0.016 * step * (brush.painting ? 0.45 : 1.1);
+          if (trail[i].life <= 0) trail.splice(i, 1);
+        }
+
         const nLen = nodes.length;
-        const attractR = 185;
-        const linkDist = Math.max(100, Math.min(w, h) * 0.13);
-        const redR = 165;
+        const painting = brush.painting || brush.active;
+        // Bigger pull + link radius while painting = mesh forms under the finger
+        const attractR = brush.painting ? 220 : 170;
+        const linkDist = Math.max(95, Math.min(w, h) * (brush.painting ? 0.16 : 0.13));
+        const redR = brush.painting ? 200 : 150;
         const redLim = redR * redR;
         const lim = linkDist * linkDist;
 
-        if (ptr.active) {
-          const g = ctx.createRadialGradient(ptr.x, ptr.y, 0, ptr.x, ptr.y, 190);
-          g.addColorStop(0, "rgba(225,6,0,0.14)");
-          g.addColorStop(0.5, "rgba(225,6,0,0.04)");
-          g.addColorStop(1, "transparent");
-          ctx.fillStyle = g;
-          ctx.fillRect(0, 0, w, h);
+        // Soft glows along the stroke trail
+        if (painting) {
+          for (let i = 0; i < trail.length; i++) {
+            const t = trail[i];
+            const g = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 90 + t.life * 40);
+            const a = 0.1 * t.life;
+            g.addColorStop(0, `rgba(225,6,0,${a})`);
+            g.addColorStop(1, "transparent");
+            ctx.fillStyle = g;
+            ctx.fillRect(t.x - 140, t.y - 140, 280, 280);
+          }
+          if (brush.active) {
+            const g = ctx.createRadialGradient(brush.x, brush.y, 0, brush.x, brush.y, 160);
+            g.addColorStop(0, "rgba(225,6,0,0.16)");
+            g.addColorStop(1, "transparent");
+            ctx.fillStyle = g;
+            ctx.fillRect(brush.x - 160, brush.y - 160, 320, 320);
+          }
         }
 
-        // ── Physics: free drift unless ptr.active ─────────
+        // ── Physics ───────────────────────────────────────
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
 
-          if (ptr.active) {
-            const dx = ptr.x - n.x;
-            const dy = ptr.y - n.y;
-            const dist = Math.hypot(dx, dy) || 1;
-            if (dist < attractR) {
-              // Same force curve as classic desktop field
-              const f = (1 - dist / attractR) * 0.095;
-              n.vx += (dx / dist) * f * step;
-              n.vy += (dy / dist) * f * step;
+          if (painting) {
+            // Pull toward live brush tip
+            {
+              const dx = brush.x - n.x;
+              const dy = brush.y - n.y;
+              const dist = Math.hypot(dx, dy) || 1;
+              if (dist < attractR) {
+                const f = (1 - dist / attractR) * (brush.painting ? 0.14 : 0.09);
+                n.vx += (dx / dist) * f * step;
+                n.vy += (dy / dist) * f * step;
+              }
+            }
+            // Also pull toward recent trail points (paint path stays “connected”)
+            if (brush.painting) {
+              for (let ti = 0; ti < trail.length; ti += 2) {
+                const t = trail[ti];
+                const dx = t.x - n.x;
+                const dy = t.y - n.y;
+                const dist = Math.hypot(dx, dy) || 1;
+                if (dist < attractR * 0.85) {
+                  const f = (1 - dist / (attractR * 0.85)) * 0.04 * t.life;
+                  n.vx += (dx / dist) * f * step;
+                  n.vy += (dy / dist) * f * step;
+                }
+              }
             }
           }
 
-          // Stronger damping when idle so the field settles open (no residual swirl)
-          n.vx *= ptr.active ? 0.99 : 0.985;
-          n.vy *= ptr.active ? 0.99 : 0.985;
+          n.vx *= brush.painting ? 0.988 : 0.985;
+          n.vy *= brush.painting ? 0.988 : 0.985;
 
-          // Cap speed — prevents orbital clumping after a strong pull
           const sp = Math.hypot(n.vx, n.vy);
-          const maxSp = ptr.active ? 2.8 : 1.2;
+          const maxSp = brush.painting ? 3.4 : 1.15;
           if (sp > maxSp) {
             n.vx = (n.vx / sp) * maxSp;
             n.vy = (n.vy / sp) * maxSp;
           }
 
-          n.x += n.vx * step * 1.2;
-          n.y += n.vy * step * 1.2;
+          n.x += n.vx * step * 1.25;
+          n.y += n.vy * step * 1.25;
           n.pulse += 0.03 * step;
 
-          // Edge bounce (not wrap, not center-pull) — keeps distribution open
           if (n.x < 0) {
             n.x = 0;
-            n.vx = Math.abs(n.vx) * 0.8;
+            n.vx *= -0.8;
           } else if (n.x > w) {
             n.x = w;
-            n.vx = -Math.abs(n.vx) * 0.8;
+            n.vx *= -0.8;
           }
           if (n.y < 0) {
             n.y = 0;
-            n.vy = Math.abs(n.vy) * 0.8;
+            n.vy *= -0.8;
           } else if (n.y > h) {
             n.y = h;
-            n.vy = -Math.abs(n.vy) * 0.8;
+            n.vy *= -0.8;
           }
         }
 
@@ -789,6 +827,22 @@
           }
           b.push(i);
         }
+
+        const nearTrail = (x, y) => {
+          if (brush.active) {
+            const dx = x - brush.x;
+            const dy = y - brush.y;
+            if (dx * dx + dy * dy < redLim) return true;
+          }
+          for (let i = 0; i < trail.length; i++) {
+            const t = trail[i];
+            const dx = x - t.x;
+            const dy = y - t.y;
+            const r = redR * (0.55 + 0.45 * t.life);
+            if (dx * dx + dy * dy < r * r) return true;
+          }
+          return false;
+        };
 
         ctx.lineCap = "round";
         for (let i = 0; i < nLen; i++) {
@@ -808,31 +862,20 @@
                 const d2 = dx * dx + dy * dy;
                 if (d2 >= lim || d2 < 0.5) continue;
                 const d = Math.sqrt(d2);
-                const alpha = (1 - d / linkDist) * 0.36;
-
-                let hot = false;
-                if (ptr.active) {
-                  const mx = (a.x + b.x) * 0.5 - ptr.x;
-                  const my = (a.y + b.y) * 0.5 - ptr.y;
-                  const da = a.x - ptr.x;
-                  const db = a.y - ptr.y;
-                  const dc = b.x - ptr.x;
-                  const dd = b.y - ptr.y;
-                  hot =
-                    mx * mx + my * my < redLim ||
-                    da * da + db * db < redLim * 0.65 ||
-                    dc * dc + dd * dd < redLim * 0.65;
-                }
+                const alpha = (1 - d / linkDist) * 0.38;
+                const mx = (a.x + b.x) * 0.5;
+                const my = (a.y + b.y) * 0.5;
+                const hot = painting && (nearTrail(mx, my) || nearTrail(a.x, a.y) || nearTrail(b.x, b.y));
 
                 ctx.beginPath();
                 ctx.moveTo(a.x, a.y);
                 ctx.lineTo(b.x, b.y);
                 if (hot) {
-                  ctx.strokeStyle = `rgba(225,6,0,${Math.min(0.95, alpha * 2.4)})`;
-                  ctx.lineWidth = 1.2;
+                  ctx.strokeStyle = `rgba(225,6,0,${Math.min(0.98, alpha * 2.6)})`;
+                  ctx.lineWidth = brush.painting ? 1.35 : 1.1;
                 } else {
-                  ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.5})`;
-                  ctx.lineWidth = 0.65;
+                  ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.48})`;
+                  ctx.lineWidth = 0.6;
                 }
                 ctx.stroke();
               }
@@ -844,31 +887,31 @@
         for (let i = 0; i < nLen; i++) {
           const n = nodes[i];
           const glow = 0.48 + Math.sin(n.pulse) * 0.22;
-          const near = ptr.active && Math.hypot(n.x - ptr.x, n.y - ptr.y) < 95;
+          const near = painting && nearTrail(n.x, n.y);
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.r * (near ? 1.9 : 1), 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, n.r * (near ? 1.95 : 1), 0, Math.PI * 2);
           ctx.fillStyle = near ? `rgba(225,6,0,${glow})` : `${WHITE}${glow})`;
           ctx.fill();
           if (near) {
             ctx.beginPath();
-            ctx.arc(n.x, n.y, n.r * 3.4, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(225,6,0,0.12)";
+            ctx.arc(n.x, n.y, n.r * 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(225,6,0,0.14)";
             ctx.fill();
           }
         }
 
-        if (ptr.active) {
-          ctx.strokeStyle = "rgba(225,6,0,0.55)";
-          ctx.lineWidth = 1;
+        // Brush tip
+        if (brush.painting || brush.active) {
+          ctx.strokeStyle = "rgba(225,6,0,0.65)";
+          ctx.lineWidth = 1.25;
           ctx.beginPath();
-          ctx.moveTo(ptr.x - 14, ptr.y);
-          ctx.lineTo(ptr.x + 14, ptr.y);
-          ctx.moveTo(ptr.x, ptr.y - 14);
-          ctx.lineTo(ptr.x, ptr.y + 14);
+          ctx.arc(brush.x, brush.y, brush.painting ? 18 : 14, 0, Math.PI * 2);
           ctx.stroke();
           ctx.beginPath();
-          ctx.arc(ptr.x, ptr.y, 24, 0, Math.PI * 2);
-          ctx.strokeStyle = "rgba(225,6,0,0.28)";
+          ctx.moveTo(brush.x - 10, brush.y);
+          ctx.lineTo(brush.x + 10, brush.y);
+          ctx.moveTo(brush.x, brush.y - 10);
+          ctx.lineTo(brush.x, brush.y + 10);
           ctx.stroke();
         }
       },

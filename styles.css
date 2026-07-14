@@ -323,16 +323,33 @@ button {
   pointer-events: none;
 }
 
-/* Invisible canvas paint layer — owns all field touch/mouse input */
+/* Full-hero paint surface — sits above text so swipe never hits links/scroll */
 .hero-paint {
   position: absolute;
   inset: 0;
-  z-index: 3;
-  touch-action: none; /* critical: no browser scroll steal while painting */
+  z-index: 8;
+  touch-action: none !important;
   cursor: crosshair;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
   background: transparent;
+}
+
+.hero.is-painting {
+  touch-action: none !important;
+}
+
+.hero.is-painting .hero-content a,
+.hero.is-painting .hero-content button {
+  pointer-events: none; /* no accidental link taps mid-swipe */
+}
+
+html.is-hero-painting,
+html.is-hero-painting body {
+  overflow: hidden !important;
+  touch-action: none !important;
+  overscroll-behavior: none;
 }
 
 .hero-vignette {
@@ -569,15 +586,21 @@ button {
 
 .hero-content {
   position: relative;
-  z-index: 5; /* above paint layer */
+  z-index: 6; /* text visible above field; paint layer is 8 so swipe always paints */
   max-width: min(640px, 100%);
   padding-right: clamp(0rem, 8vw, 2rem);
-  /* Let touches pass through empty text space to the paint layer */
   pointer-events: none;
 }
 
-.hero-content a,
-.hero-content button {
+/* Only CTAs sit above the paint layer so they remain tappable */
+.hero-content .hero-actions {
+  position: relative;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.hero-content .hero-actions a,
+.hero-content .hero-actions button {
   pointer-events: auto;
 }
 

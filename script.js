@@ -149,12 +149,20 @@
     if (bootFill) bootFill.style.width = "0%";
     if (bootStatus) bootStatus.textContent = bootMsgs[0];
 
+    // Mobile gets a longer, more readable splash
+    const stepMs = isMobile ? 95 : 55;
+    const stepJitter = isMobile ? 55 : 40;
+    const progressMin = isMobile ? 2 : 3.5;
+    const progressSpan = isMobile ? 3.5 : 7;
+    const holdMs = isMobile ? 1000 : 420;
+    const fadeMs = isMobile ? 550 : 450;
+    const startMs = isMobile ? 220 : 120;
+
     return new Promise((resolve) => {
       let p = 0;
       let msgI = 0;
-      // ~1.4–1.8s progress + hold — visible on every hard refresh
       const tick = () => {
-        p = Math.min(100, p + Math.random() * 7 + 3.5);
+        p = Math.min(100, p + Math.random() * progressSpan + progressMin);
         if (bootFill) bootFill.style.width = p + "%";
         const nextMsg = Math.floor((p / 100) * (bootMsgs.length - 1));
         if (nextMsg !== msgI && bootStatus) {
@@ -162,18 +170,17 @@
           bootStatus.textContent = bootMsgs[msgI];
         }
         if (p < 100) {
-          setTimeout(tick, 55 + Math.random() * 40);
+          setTimeout(tick, stepMs + Math.random() * stepJitter);
         } else {
           if (bootStatus) bootStatus.textContent = bootMsgs[bootMsgs.length - 1];
           if (bootFill) bootFill.style.width = "100%";
           setTimeout(() => {
             boot.classList.add("done");
-            // Wait for CSS fade before resolving engines
-            setTimeout(resolve, 450);
-          }, 420);
+            setTimeout(resolve, fadeMs);
+          }, holdMs);
         }
       };
-      setTimeout(tick, 120);
+      setTimeout(tick, startMs);
     });
   }
 
@@ -315,48 +322,138 @@
     }, 3600);
   }
 
-  // ─── Title rotator ──────────────────────────────────────
+  // ─── Title rotator (desktop + mobile — always cycle) ────
   function initTitleRotator() {
     const root = document.getElementById("titleRotator");
-    if (!root || reduceMotion) return;
+    if (!root) return;
     const words = Array.from(root.querySelectorAll(".rotator-word"));
     if (words.length < 2) return;
+
+    // Ensure clean starting state
+    words.forEach((w, idx) => {
+      w.classList.toggle("is-active", idx === 0);
+      w.classList.remove("is-exit");
+    });
+
     let i = 0;
-    setInterval(() => {
+    const cycle = () => {
       const current = words[i];
       const next = words[(i + 1) % words.length];
       current.classList.remove("is-active");
       current.classList.add("is-exit");
+      // Force reflow so wordIn restarts every cycle (desktop bug)
+      next.classList.remove("is-active", "is-exit");
+      void next.offsetWidth;
       next.classList.add("is-active");
-      next.classList.remove("is-exit");
-      setTimeout(() => current.classList.remove("is-exit"), 560);
+      setTimeout(() => current.classList.remove("is-exit"), 600);
       i = (i + 1) % words.length;
-    }, 3200);
+    };
+
+    // Start after boot-ish delay so first word is readable
+    setTimeout(() => {
+      setInterval(cycle, 3000);
+    }, isMobile ? 2800 : 1800);
   }
 
-  // ─── 3D parallax desktop ────────────────────────────────
+  // ─── 3D stage: float + mouse parallax + touch drag ──────
   function initScene3d() {
     const stage = document.querySelector(".hero-3d");
-    if (!stage || reduceMotion || isCoarse || !isFine) return;
-    let tx = 0,
-      ty = 0,
-      cx = 0,
-      cy = 0;
-    window.addEventListener(
-      "mousemove",
-      (e) => {
-        tx = (e.clientY / window.innerHeight - 0.5) * -28;
-        ty = (e.clientX / window.innerWidth - 0.5) * 40;
-      },
-      { passive: true }
-    );
+    const scene = document.getElementById("scene3d");
+    if (!stage || !scene) return;
+
+    let targetX = 0;
+    let targetY = 0;
+    let curX = 0;
+    let curY = 0;
+    let dragging = false;
+    let lastPX = 0;
+    let lastPY = 0;
+    let autoTilt = true;
+
+    const apply = () => {
+      stage.style.setProperty("--par-x", curX.toFixed(2) + "deg");
+      stage.style.setProperty("--par-y", curY.toFixed(2) + "deg");
+    };
+
+    // Desktop hover parallax (gentle)
+    if (isFine) {
+      window.addEventListener(
+        "mousemove",
+        (e) => {
+          if (dragging) return;
+          if (!autoTilt) return;
+          targetX = (e.clientY / window.innerHeight - 0.5) * -22;
+          targetY = (e.clientX / window.innerWidth - 0.5) * 32;
+        },
+        { passive: true }
+      );
+    }
+
+    // Drag / touch to spin the stage (desktop + mobile)
+    const onDown = (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      dragging = true;
+      autoTilt = false;
+      lastPX = e.clientX;
+      lastPY = e.clientY;
+      stage.classList.add("is-dragging");
+      scene.classList.add("is-dragging");
+      try {
+        stage.setPointerCapture(e.pointerId);
+      } catch (_) {}
+      e.preventDefault();
+    };
+
+    const onMove = (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastPX;
+      const dy = e.clientY - lastPY;
+      lastPX = e.clientX;
+      lastPY = e.clientY;
+      targetY += dx * 0.45;
+      targetX -= dy * 0.35;
+      // Clamp extreme tilts
+      targetX = Math.max(-48, Math.min(48, targetX));
+      targetY = Math.max(-80, Math.min(80, targetY));
+      // Snap current toward target while dragging for snappy feel
+      curX += (targetX - curX) * 0.35;
+      curY += (targetY - curY) * 0.35;
+      apply();
+    };
+
+    const onUp = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      stage.classList.remove("is-dragging");
+      scene.classList.remove("is-dragging");
+      try {
+        stage.releasePointerCapture?.(e.pointerId);
+      } catch (_) {}
+      // Ease back to auto hover after a beat
+      setTimeout(() => {
+        if (!dragging) autoTilt = true;
+      }, 1200);
+    };
+
+    stage.addEventListener("pointerdown", onDown, { passive: false });
+    stage.addEventListener("pointermove", onMove, { passive: true });
+    stage.addEventListener("pointerup", onUp, { passive: true });
+    stage.addEventListener("pointercancel", onUp, { passive: true });
+
     createRunner(
       stage,
       () => {
-        cx += (tx - cx) * 0.08;
-        cy += (ty - cy) * 0.08;
-        stage.style.setProperty("--par-x", cx.toFixed(2) + "deg");
-        stage.style.setProperty("--par-y", cy.toFixed(2) + "deg");
+        if (!dragging) {
+          curX += (targetX - curX) * 0.07;
+          curY += (targetY - curY) * 0.07;
+          if (autoTilt && !isFine) {
+            // Gentle auto idle tilt on mobile when not dragging
+            const t = performance.now() * 0.0004;
+            targetX = Math.sin(t) * 8;
+            targetY = Math.cos(t * 0.7) * 12;
+          }
+          apply();
+        }
       },
       0,
       true

@@ -508,18 +508,19 @@
   });
 
   // ═══════════════════════════════════════════════════════
-  // HERO field — free drift idle; mouse/touch influence only
-  // when intentional (scroll on mobile does NOT attract)
+  // HERO field — real paint surface (canvas-like finger track)
   // ═══════════════════════════════════════════════════════
   function initHeroField() {
     const canvas = document.getElementById("field");
-    if (!canvas) return;
+    const paint = document.getElementById("heroPaint");
+    const hero = document.getElementById("hero") || canvas?.parentElement;
+    if (!canvas || !hero) return;
     const ctx = canvas.getContext("2d", { alpha: true });
     const hudCoords = document.getElementById("hudCoords");
     const hudFps = document.getElementById("hudFps");
     const hudNodes = document.getElementById("hudNodes");
-    const hero = canvas.parentElement;
-    if (!hero) return;
+    // All input goes through the paint layer (or hero fallback)
+    const surface = paint || hero;
 
     let w = 0,
       h = 0,
@@ -528,16 +529,8 @@
     let frames = 0,
       fpsT = 0;
 
-    // Mouse hover OR finger-down tracking (fluid). Scroll cancels touch.
-    const ptr = {
-      x: 0,
-      y: 0,
-      active: false,
-      down: false,
-      id: null,
-      startScroll: 0,
-      cancelled: false,
-    };
+    // Live pointer in field space — updated every move event
+    const ptr = { x: 0, y: 0, active: false, id: null };
 
     const spawn = (edge) => {
       let x = Math.random() * w;
@@ -570,13 +563,11 @@
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Same density logic — only rebuild if empty or huge size change
       const density = 3200;
       const count = Math.max(120, Math.min(isMobile ? 200 : 320, ((w * h) / density) | 0));
       if (!nodes.length) {
         nodes = Array.from({ length: count }, () => spawn());
       } else if (Math.abs(nodes.length - count) > 40) {
-        // resize existing set without full clump-respawn
         while (nodes.length < count) nodes.push(spawn());
         while (nodes.length > count) nodes.pop();
       }
@@ -586,91 +577,115 @@
     resize();
     requestAnimationFrame(() => requestAnimationFrame(resize));
 
-    const toField = (clientX, clientY) => {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: ((clientX - rect.left) / Math.max(1, rect.width)) * w,
-        y: ((clientY - rect.top) / Math.max(1, rect.height)) * h,
-      };
-    };
-
-    const setActiveAt = (clientX, clientY, on) => {
-      if (on) {
-        const p = toField(clientX, clientY);
-        ptr.x = p.x;
-        ptr.y = p.y;
-        ptr.active = true;
-        if (hudCoords) {
-          hudCoords.textContent = `X ${((ptr.x / w) * 2 - 1).toFixed(3)} · Y ${((ptr.y / h) * 2 - 1).toFixed(3)}`;
-        }
-      } else {
-        ptr.active = false;
+    // Map client → field coordinates using paint/surface bounds
+    const track = (clientX, clientY) => {
+      const rect = surface.getBoundingClientRect();
+      ptr.x = ((clientX - rect.left) / Math.max(1, rect.width)) * w;
+      ptr.y = ((clientY - rect.top) / Math.max(1, rect.height)) * h;
+      ptr.active = true;
+      if (hudCoords) {
+        hudCoords.textContent = `X ${((ptr.x / w) * 2 - 1).toFixed(3)} · Y ${((ptr.y / h) * 2 - 1).toFixed(3)}`;
       }
     };
 
-    // ── Mouse = hover tracking ────────────────────────────
-    hero.addEventListener(
-      "pointermove",
-      (e) => {
-        if (e.pointerType === "mouse") {
-          setActiveAt(e.clientX, e.clientY, true);
-          return;
-        }
-        // Touch: fluid follow while finger is down (no hold gate)
-        if (!ptr.down || ptr.cancelled) return;
-        if (ptr.id != null && e.pointerId !== ptr.id) return;
-        const scrollNow = window.scrollY || window.pageYOffset || 0;
-        if (Math.abs(scrollNow - ptr.startScroll) > 8) {
-          ptr.cancelled = true;
-          ptr.active = false;
-          return;
-        }
-        setActiveAt(e.clientX, e.clientY, true);
-      },
-      { passive: true }
-    );
-    hero.addEventListener(
-      "pointerleave",
-      (e) => {
-        if (e.pointerType === "mouse") ptr.active = false;
-      },
-      { passive: true }
-    );
+    const release = () => {
+      ptr.active = false;
+      ptr.id = null;
+    };
 
-    // ── Touch: immediate + fluid with the finger ──────────
-    hero.addEventListener(
+    // ── Canvas-style input on paint layer ─────────────────
+    // touch-action:none on .hero-paint + preventDefault = fluid finger paint
+    surface.addEventListener(
       "pointerdown",
       (e) => {
-        if (e.pointerType === "mouse") return;
-        ptr.down = true;
+        if (e.pointerType === "mouse" && e.button !== 0) return;
         ptr.id = e.pointerId;
-        ptr.startScroll = window.scrollY || window.pageYOffset || 0;
-        ptr.cancelled = false;
-        // Engage immediately — no press-and-hold delay
-        setActiveAt(e.clientX, e.clientY, true);
+        track(e.clientX, e.clientY);
+        try {
+          surface.setPointerCapture(e.pointerId);
+        } catch (_) {}
+        // Stop the page from scrolling while painting the field
+        if (e.cancelable) e.preventDefault();
+      },
+      { passive: false }
+    );
+
+    surface.addEventListener(
+      "pointermove",
+      (e) => {
+        // Mouse: hover always paints (desktop feel)
+        if (e.pointerType === "mouse") {
+          track(e.clientX, e.clientY);
+          return;
+        }
+        // Touch / pen: fluid track while this pointer is the active stroke
+        if (ptr.id === e.pointerId) {
+          track(e.clientX, e.clientY);
+          if (e.cancelable) e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+
+    surface.addEventListener(
+      "pointerup",
+      (e) => {
+        if (ptr.id != null && e.pointerId !== ptr.id) return;
+        // Mouse keeps hover if still over surface; touch releases
+        if (e.pointerType === "mouse") {
+          // stay active if still over — leave handles exit
+          return;
+        }
+        release();
+        try {
+          surface.releasePointerCapture?.(e.pointerId);
+        } catch (_) {}
       },
       { passive: true }
     );
 
-    const endPointer = (e) => {
-      if (e.pointerType === "mouse") return;
-      if (ptr.id != null && e.pointerId !== ptr.id) return;
-      ptr.down = false;
-      ptr.id = null;
-      ptr.cancelled = false;
-      ptr.active = false;
-    };
-    hero.addEventListener("pointerup", endPointer, { passive: true });
-    hero.addEventListener("pointercancel", endPointer, { passive: true });
+    surface.addEventListener(
+      "pointercancel",
+      (e) => {
+        if (ptr.id != null && e.pointerId !== ptr.id) return;
+        release();
+      },
+      { passive: true }
+    );
 
-    // Scrolling the page while touching → release field (don't fight scroll)
-    window.addEventListener(
-      "scroll",
+    surface.addEventListener(
+      "pointerleave",
+      (e) => {
+        if (e.pointerType === "mouse") release();
+      },
+      { passive: true }
+    );
+
+    // Fallback raw touch (some WebViews)
+    surface.addEventListener(
+      "touchstart",
+      (e) => {
+        const t = e.touches[0];
+        if (!t) return;
+        track(t.clientX, t.clientY);
+        if (e.cancelable) e.preventDefault();
+      },
+      { passive: false }
+    );
+    surface.addEventListener(
+      "touchmove",
+      (e) => {
+        const t = e.touches[0];
+        if (!t) return;
+        track(t.clientX, t.clientY);
+        if (e.cancelable) e.preventDefault();
+      },
+      { passive: false }
+    );
+    surface.addEventListener(
+      "touchend",
       () => {
-        if (ptr.down) {
-          ptr.cancelled = true;
-          ptr.active = false;
-        }
+        release();
       },
       { passive: true }
     );

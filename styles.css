@@ -319,6 +319,20 @@ button {
   width: 100%;
   height: 100%;
   display: block;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Invisible canvas paint layer — owns all field touch/mouse input */
+.hero-paint {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  touch-action: none; /* critical: no browser scroll steal while painting */
+  cursor: crosshair;
+  -webkit-user-select: none;
+  user-select: none;
+  background: transparent;
 }
 
 .hero-vignette {
@@ -329,6 +343,11 @@ button {
     linear-gradient(to top, #000 0%, transparent 30%);
   pointer-events: none;
   z-index: 1;
+}
+
+.hero-hud {
+  z-index: 2;
+  pointer-events: none;
 }
 
 .hero-scan {
@@ -550,9 +569,16 @@ button {
 
 .hero-content {
   position: relative;
-  z-index: 3;
+  z-index: 5; /* above paint layer */
   max-width: min(640px, 100%);
   padding-right: clamp(0rem, 8vw, 2rem);
+  /* Let touches pass through empty text space to the paint layer */
+  pointer-events: none;
+}
+
+.hero-content a,
+.hero-content button {
+  pointer-events: auto;
 }
 
 .eyebrow {

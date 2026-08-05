@@ -2305,6 +2305,8 @@ html.is-hero-painting body {
 .partner-card.reveal:nth-child(4) { transition-delay: 0.2s; }
 .partner-card.reveal:nth-child(5) { transition-delay: 0.25s; }
 .partner-card.reveal:nth-child(6) { transition-delay: 0.3s; }
+.partner-card.reveal:nth-child(7) { transition-delay: 0.35s; }
+.partner-card.reveal:nth-child(8) { transition-delay: 0.4s; }
 
 ::selection {
   background: var(--red);

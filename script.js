@@ -288,6 +288,26 @@
     });
   });
 
+  // Field log — light the orbit currently in the read band
+  const fieldEntries = [...document.querySelectorAll(".field-entry")];
+  const fieldRail = [...document.querySelectorAll(".field-rail [data-orbit]")];
+  if (fieldEntries.length && "IntersectionObserver" in window) {
+    const setHot = (id) => {
+      fieldEntries.forEach((el) => el.classList.toggle("is-hot", el.dataset.orbit === id));
+      fieldRail.forEach((el) => el.classList.toggle("is-hot", el.dataset.orbit === id));
+    };
+    const fio = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible) setHot(visible.target.dataset.orbit);
+      },
+      { rootMargin: "-28% 0px -42% 0px", threshold: [0.2, 0.45, 0.7] }
+    );
+    fieldEntries.forEach((el) => fio.observe(el));
+  }
+
   // ─── Ticker ─────────────────────────────────────────────
   const ticker = document.getElementById("tickerTrack");
   if (ticker) {

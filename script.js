@@ -292,18 +292,17 @@
   const ticker = document.getElementById("tickerTrack");
   if (ticker) {
     const items = [
-      "ENGINEERING",
-      "BEAUTY",
-      "PRECISION",
+      "TRUTH",
+      "AWARENESS",
+      "CONSCIOUSNESS",
+      "PHILOSOPHY",
+      "TEAMWORK",
+      "DREAMWORK",
       "SYSTEMS",
-      "MOTION",
-      "DNA",
-      "INTERFACES",
-      "CRAFT",
-      "VELOCITY",
-      "SIGNAL",
-      "COHERENCE",
-      "ATTENTION",
+      "IRL",
+      "RANK",
+      "QUESTIONS",
+      "ANSWERS",
     ];
     const html = items.map((t) => `<span>${t}</span><span class="sep">◆</span>`).join("");
     ticker.innerHTML = html + html;
@@ -311,7 +310,7 @@
 
   // ─── Status ─────────────────────────────────────────────
   const typeStatus = document.getElementById("typeStatus");
-  const statusLines = ["SYSTEM ARMED", "FIELD ACTIVE", "RENDER LOCKED", "JDE ONLINE"];
+  const statusLines = ["FIELD AWAKE", "RANK LIVE", "TRUTH LOCKED", "JDE ONLINE"];
   let statusI = 0;
   if (typeStatus && !reduceMotion) {
     typeStatus.style.transition = "opacity 0.2s";

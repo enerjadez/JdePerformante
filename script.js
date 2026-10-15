@@ -2045,6 +2045,586 @@
     }, isMobile ? 30 : 0);
   }
 
+  // ═══════════════════════════════════════════════════════
+  // Dough — a soft body. Press to dent. Drag to pull.
+  // ═══════════════════════════════════════════════════════
+  function initDough() {
+    const canvas = document.getElementById("doughCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+
+    const cols = isMobile ? 7 : 8;
+    const rows = isMobile ? 6 : 6;
+    const pts = [];
+    let w = 0;
+    let h = 0;
+    let spacing = 40;
+    const pointer = { x: -9999, y: -9999, down: false, vx: 0, vy: 0 };
+
+    function layout() {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 4 || rect.height < 4) return;
+      w = rect.width;
+      h = rect.height;
+      const dpr = maxDpr;
+      canvas.width = (w * dpr) | 0;
+      canvas.height = (h * dpr) | 0;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const cx = w * 0.5;
+      const cy = h * 0.46;
+      const rx = w * 0.34;
+      const ry = h * 0.3;
+      spacing = Math.min((2 * rx) / (cols - 1), (2 * ry) / (rows - 1));
+      const rad = spacing * 0.9;
+
+      if (!pts.length) {
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const u = c / (cols - 1);
+            const v = r / (rows - 1);
+            const ex = (u - 0.5) * 2;
+            const ey = (v - 0.5) * 2;
+            if (ex * ex + ey * ey > 1.05) continue;
+            pts.push({
+              x: 0,
+              y: 0,
+              vx: 0,
+              vy: 0,
+              u,
+              v,
+              jx: (Math.random() - 0.5) * 0.05,
+              jy: (Math.random() - 0.5) * 0.05,
+              ox: 0,
+              oy: 0,
+              held: false,
+              holdX: 0,
+              holdY: 0,
+              bonds: [],
+            });
+          }
+        }
+      }
+      for (const p of pts) {
+        p.hx = cx + (p.u - 0.5 + p.jx) * 2 * rx;
+        p.hy = cy + (p.v - 0.5 + p.jy) * 2 * ry;
+        p.r = rad;
+        if (!p.placed) {
+          p.x = p.hx;
+          p.y = p.hy;
+          p.placed = true;
+        }
+        p.bonds = [];
+      }
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const dx = pts[i].hx - pts[j].hx;
+          const dy = pts[i].hy - pts[j].hy;
+          const dist = Math.hypot(dx, dy);
+          if (dist < spacing * 1.42) {
+            pts[i].bonds.push({ n: pts[j], rest: dist });
+          }
+        }
+      }
+    }
+
+    onResize(layout);
+    new ResizeObserver(layout).observe(canvas);
+    layout();
+
+    function setPtr(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      if (pointer.x > -1000) {
+        pointer.vx = x - pointer.x;
+        pointer.vy = y - pointer.y;
+      } else {
+        pointer.vx = 0;
+        pointer.vy = 0;
+      }
+      pointer.x = x;
+      pointer.y = y;
+    }
+
+    function release() {
+      pointer.down = false;
+      pointer.vx = 0;
+      pointer.vy = 0;
+      for (const p of pts) p.held = false;
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      pointer.down = true;
+      setPtr(e);
+      pointer.vx = 0;
+      pointer.vy = 0;
+      const reach = Math.max(96, spacing * 1.7);
+      const reach2 = reach * reach;
+      for (const p of pts) {
+        const dx = p.x - pointer.x;
+        const dy = p.y - pointer.y;
+        if (dx * dx + dy * dy < reach2) {
+          p.held = true;
+          p.holdX = dx;
+          p.holdY = dy;
+        } else {
+          p.held = false;
+        }
+      }
+    });
+    canvas.addEventListener("pointermove", setPtr);
+    canvas.addEventListener("pointerup", (e) => {
+      release();
+      if (e.pointerType !== "mouse") {
+        pointer.x = -9999;
+        pointer.y = -9999;
+      }
+    });
+    canvas.addEventListener("pointercancel", () => {
+      release();
+      pointer.x = -9999;
+      pointer.y = -9999;
+    });
+    canvas.addEventListener("pointerleave", () => {
+      if (!pointer.down) {
+        pointer.x = -9999;
+        pointer.y = -9999;
+        pointer.vx = 0;
+        pointer.vy = 0;
+      }
+    });
+
+    createRunner(canvas, (now, dt) => {
+      if (!pts.length || w < 4) return;
+      const breathe = Math.sin(now * 0.0011);
+      const reach = Math.max(96, spacing * 1.7);
+      const reach2 = reach * reach;
+      const minDist = spacing * 0.55;
+      const lim = Math.min(w, h) * 0.22;
+
+      for (const p of pts) {
+        const hx = p.hx + p.ox + breathe * 2.2 * Math.cos(p.u * 5.2);
+        const hy = p.hy + p.oy + breathe * 1.6 * Math.sin(p.v * 4.6);
+        let ax = 0;
+        let ay = 0;
+        if (p.held && pointer.down) {
+          ax = (pointer.x + p.holdX - p.x) * 0.62;
+          ay = (pointer.y + p.holdY - p.y) * 0.62;
+          p.ox += (p.x - p.hx - p.ox) * 0.012 * dt;
+          p.oy += (p.y - p.hy - p.oy) * 0.012 * dt;
+          p.ox = Math.max(-lim, Math.min(lim, p.ox));
+          p.oy = Math.max(-lim, Math.min(lim, p.oy));
+        } else {
+          ax = (hx - p.x) * 0.05;
+          ay = (hy - p.y) * 0.05;
+          const dx = p.x - pointer.x;
+          const dy = p.y - pointer.y;
+          const d2 = dx * dx + dy * dy;
+          if (!pointer.down && d2 < reach2 && d2 > 0.25) {
+            const d = Math.sqrt(d2);
+            const push = (1 - d / reach) ** 2 * 4.2;
+            ax += (dx / d) * push;
+            ay += (dy / d) * push;
+          }
+        }
+
+        p.vx = (p.vx + ax * dt) * 0.74;
+        p.vy = (p.vy + ay * dt) * 0.74;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+      }
+
+      for (const p of pts) {
+        for (const bond of p.bonds) {
+          const o = bond.n;
+          const dx = o.x - p.x;
+          const dy = o.y - p.y;
+          const d = Math.hypot(dx, dy) || 0.001;
+          const extra = d - bond.rest * 1.5;
+          if (extra <= 0) continue;
+          const corr = extra * 0.14;
+          const nx = dx / d;
+          const ny = dy / d;
+          const wP = p.held && pointer.down ? 0.18 : 1;
+          const wO = o.held && pointer.down ? 0.18 : 1;
+          const sum = wP + wO;
+          p.x += nx * corr * (wP / sum);
+          p.y += ny * corr * (wP / sum);
+          o.x -= nx * corr * (wO / sum);
+          o.y -= ny * corr * (wO / sum);
+        }
+      }
+
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const a = pts[i];
+          const b = pts[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const d2 = dx * dx + dy * dy;
+          const min2 = minDist * minDist;
+          if (d2 >= min2 || d2 < 0.04) continue;
+          const d = Math.sqrt(d2);
+          const push = (minDist - d) * 0.22;
+          const nx = dx / d;
+          const ny = dy / d;
+          a.x -= nx * push;
+          a.y -= ny * push;
+          b.x += nx * push;
+          b.y += ny * push;
+        }
+      }
+
+      pointer.vx *= 0.7;
+      pointer.vy *= 0.7;
+
+      ctx.fillStyle = "#140000";
+      ctx.fillRect(0, 0, w, h);
+
+      const blur = Math.max(16, spacing * 0.34);
+      ctx.save();
+      ctx.filter = "blur(" + blur.toFixed(1) + "px)";
+      ctx.fillStyle = "#e10600";
+      ctx.beginPath();
+      for (const p of pts) {
+        ctx.moveTo(p.x + p.r * 1.12, p.y);
+        ctx.arc(p.x, p.y, p.r * 1.12, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.fillStyle = "#f4f4f4";
+      ctx.beginPath();
+      for (const p of pts) {
+        ctx.moveTo(p.x + p.r * 0.86, p.y);
+        ctx.arc(p.x, p.y, p.r * 0.86, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      ctx.restore();
+    }, isMobile ? 30 : 0);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // Passage — a membrane between a hand, a page, and a light
+  // ═══════════════════════════════════════════════════════
+  function initPassage() {
+    const canvas = document.getElementById("passageCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+
+    const lineEl = document.getElementById("passageLine");
+    const worldEls = Array.from(document.querySelectorAll(".passage-worlds li"));
+    const lines = [
+      "A hand enters a page.",
+      "The page lets the hand through.",
+      "Light was on the other side.",
+      "The seam was only a habit.",
+      "Human. Page. Light.",
+    ];
+    const worldForLine = [0, 1, 2, 1, -1];
+    let lineI = 0;
+    let lineT = 0;
+    let fading = false;
+
+    function lightWorld(i) {
+      const which = worldForLine[i];
+      worldEls.forEach((el, idx) => {
+        el.classList.toggle("is-lit", which < 0 || idx === which);
+      });
+    }
+    lightWorld(0);
+
+    const words = ["div", "px", "href", "</>", "100vh", "scroll", "body", "{ }", "em", "::"];
+    const bits = [];
+    const motes = [];
+    const fibers = [];
+    let w = 0;
+    let h = 0;
+    const pointer = { x: 0, y: 0, on: false };
+
+    function seed() {
+      bits.length = 0;
+      motes.length = 0;
+      fibers.length = 0;
+      const nBits = isMobile ? 26 : 42;
+      const nMotes = isMobile ? 36 : 70;
+      const nFibers = isMobile ? 34 : 58;
+      for (let i = 0; i < nBits; i++) {
+        bits.push({
+          x: Math.random() * w * 0.5,
+          y: Math.random() * h,
+          s: words[i % words.length],
+          v: 0.18 + Math.random() * 0.38,
+          crossed: false,
+          a: 0.28 + Math.random() * 0.4,
+        });
+      }
+      for (let i = 0; i < nMotes; i++) {
+        motes.push({
+          x: w * (0.62 + Math.random() * 0.36),
+          y: Math.random() * h,
+          r: 0.7 + Math.random() * 1.6,
+          v: 0.28 + Math.random() * 0.7,
+          pixel: false,
+        });
+      }
+      for (let i = 0; i < nFibers; i++) {
+        fibers.push({
+          y: Math.random() * h,
+          len: 12 + Math.random() * 26,
+          peel: 0,
+          x: 0,
+          vy: 0,
+        });
+      }
+    }
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 4 || rect.height < 4) return;
+      const prevW = w;
+      w = rect.width;
+      h = rect.height;
+      const dpr = maxDpr;
+      canvas.width = (w * dpr) | 0;
+      canvas.height = (h * dpr) | 0;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (!bits.length || prevW < 4) seed();
+    }
+
+    onResize(resize);
+    new ResizeObserver(resize).observe(canvas);
+    resize();
+
+    function track(e) {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = e.clientX - rect.left;
+      pointer.y = e.clientY - rect.top;
+      pointer.on = true;
+    }
+    canvas.addEventListener("pointermove", track);
+    canvas.addEventListener("pointerdown", track);
+    canvas.addEventListener("pointerleave", () => {
+      pointer.on = false;
+    });
+
+    function influence(y, hy, openR) {
+      const dy = y - hy;
+      return Math.exp(-(dy * dy) / (2 * openR * openR * 0.32));
+    }
+
+    createRunner(canvas, (now, dt) => {
+      if (w < 4 || h < 4) return;
+
+      lineT += dt;
+      if (!fading && lineT > 210 && lineEl) {
+        fading = true;
+        lineEl.style.opacity = "0";
+      }
+      if (fading && lineT > 242) {
+        lineT = 0;
+        fading = false;
+        lineI = (lineI + 1) % lines.length;
+        lineEl.textContent = lines[lineI];
+        lineEl.style.opacity = "1";
+        lightWorld(lineI);
+      }
+
+      const seamX = w * 0.62;
+      const idleX = seamX + Math.sin(now * 0.00033) * Math.min(70, w * 0.05);
+      const idleY = h * 0.42 + Math.sin(now * 0.00048) * h * 0.1;
+      const hx = pointer.on ? pointer.x : idleX;
+      const hy = pointer.on ? pointer.y : idleY;
+      const breath = 42 + 16 * Math.sin(now * 0.0009);
+      const openR = breath + (pointer.on ? 96 : 34);
+
+      ctx.fillStyle = "#12081a";
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#140a1c";
+      ctx.fillRect(0, 0, seamX, h);
+
+      ctx.strokeStyle = "rgba(126,224,208,0.09)";
+      ctx.lineWidth = 1;
+      const gap = 52;
+      const drift = (now * 0.018) % gap;
+      ctx.beginPath();
+      for (let x = gap; x < seamX; x += gap) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+      }
+      for (let y = drift; y < h; y += gap) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(seamX, y);
+      }
+      ctx.stroke();
+
+      const shaft = ctx.createLinearGradient(seamX, 0, w, 0);
+      shaft.addColorStop(0, "rgba(231,197,106,0)");
+      shaft.addColorStop(0.28, "rgba(231,197,106,0.16)");
+      shaft.addColorStop(0.62, "rgba(126,224,208,0.05)");
+      shaft.addColorStop(1, "rgba(18,8,26,0)");
+      ctx.fillStyle = shaft;
+      ctx.fillRect(seamX, 0, w - seamX, h);
+
+      const beamX = w * 0.8 + Math.sin(now * 0.00022) * 18;
+      const beam = ctx.createLinearGradient(beamX - 46, 0, beamX + 46, 0);
+      beam.addColorStop(0, "rgba(231,197,106,0)");
+      beam.addColorStop(0.5, "rgba(243,236,223,0.18)");
+      beam.addColorStop(1, "rgba(231,197,106,0)");
+      ctx.fillStyle = beam;
+      ctx.fillRect(beamX - 46, 0, 92, h);
+
+      const steps = 72;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const y = (i / steps) * h;
+        const tear = influence(y, hy, openR) * openR;
+        const x = seamX - tear;
+        if (i) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+      }
+      for (let i = steps; i >= 0; i--) {
+        const y = (i / steps) * h;
+        const tear = influence(y, hy, openR) * openR * 0.78;
+        ctx.lineTo(seamX + tear, y);
+      }
+      ctx.closePath();
+      const wash = ctx.createLinearGradient(hx - 40, hy, seamX + openR, hy);
+      wash.addColorStop(0, "rgba(126,224,208,0.05)");
+      wash.addColorStop(0.45, "rgba(231,197,106,0.34)");
+      wash.addColorStop(1, "rgba(243,236,223,0.06)");
+      ctx.fillStyle = wash;
+      ctx.fill();
+
+      ctx.lineWidth = 1.25;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const y = (i / steps) * h;
+        const x = seamX - influence(y, hy, openR) * openR;
+        if (i) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+      }
+      ctx.strokeStyle = "rgba(243,236,223,0.72)";
+      ctx.stroke();
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const y = (i / steps) * h;
+        const x = seamX + influence(y, hy, openR) * openR * 0.78;
+        if (i) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+      }
+      ctx.strokeStyle = "rgba(231,197,106,0.8)";
+      ctx.stroke();
+
+      ctx.lineWidth = 1;
+      for (const f of fibers) {
+        const inf = influence(f.y, hy, openR);
+        if (f.peel <= 0) {
+          if (inf > 0.62 && Math.random() < 0.015 * dt) {
+            f.peel = 0.02;
+            f.x = seamX;
+            f.vy = -0.25 - Math.random() * 0.45;
+          }
+          const x = seamX + Math.sin(now * 0.001 + f.y * 0.02) * 1.4;
+          ctx.strokeStyle = "rgba(243,236,223,0.22)";
+          ctx.beginPath();
+          ctx.moveTo(x, f.y);
+          ctx.lineTo(x, f.y + f.len);
+          ctx.stroke();
+        } else {
+          f.peel = Math.min(1, f.peel + 0.012 * dt);
+          f.x += (0.55 + f.peel * 1.1) * dt;
+          f.y += f.vy * dt;
+          ctx.strokeStyle = "rgba(231,197,106,0.85)";
+          ctx.beginPath();
+          ctx.moveTo(f.x, f.y);
+          ctx.lineTo(f.x + 8 + f.peel * 18, f.y - f.len * 0.35);
+          ctx.stroke();
+          if (f.x > w + 24 || f.y < -40 || f.y > h + 40) {
+            f.peel = 0;
+            f.y = Math.random() * h;
+          }
+        }
+      }
+
+      ctx.font = "12px 'IBM Plex Mono', ui-monospace, monospace";
+      ctx.textBaseline = "middle";
+      for (const b of bits) {
+        b.x += b.v * dt * 0.7;
+        b.y += Math.sin(now * 0.001 + b.x * 0.01) * 0.12 * dt;
+        const lip = seamX - influence(b.y, hy, openR) * openR;
+        if (b.x > lip) b.crossed = true;
+        const copyW = Math.min(w * 0.44, 640);
+        const overType = b.x < copyW && b.y > h * 0.5;
+        if (!overType) {
+          if (b.crossed) {
+            b.y -= 0.42 * dt;
+            ctx.fillStyle = "rgba(231,197,106,0.92)";
+          } else {
+            ctx.fillStyle = "rgba(126,224,208," + b.a.toFixed(3) + ")";
+          }
+          ctx.fillText(b.s, b.x, b.y);
+        } else if (b.crossed) {
+          b.y -= 0.42 * dt;
+        }
+        if (b.x > w + 36 || b.y < -24) {
+          b.x = -40 - Math.random() * 60;
+          b.y = Math.random() * h;
+          b.crossed = false;
+        }
+      }
+
+      for (const m of motes) {
+        const near = influence(m.y, hy, openR);
+        const lip = seamX + near * openR * 0.78;
+        if (!m.pixel && m.x < lip && near > 0.2) m.pixel = true;
+        if (m.pixel) {
+          m.x += (hx - m.x) * 0.012 * dt;
+          m.y += (hy - m.y) * 0.012 * dt;
+          ctx.fillStyle = "rgba(243,236,223,0.88)";
+          const s = 2.2 + m.r;
+          ctx.fillRect(m.x, m.y, s, s);
+          const dx = m.x - hx;
+          const dy = m.y - hy;
+          if (dx * dx + dy * dy < 140) {
+            m.pixel = false;
+            m.x = seamX + 24 + Math.random() * Math.max(20, w - seamX - 30);
+            m.y = -8;
+          }
+        } else {
+          m.y += m.v * dt * 0.85;
+          m.x += Math.sin(now * 0.0007 + m.y * 0.01) * 0.16 * dt;
+          ctx.fillStyle = "rgba(231,197,106,0.8)";
+          ctx.beginPath();
+          ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+          ctx.fill();
+          if (m.y > h + 10) {
+            m.y = -8;
+            m.x = seamX + Math.random() * Math.max(20, w - seamX);
+          }
+        }
+      }
+
+      const ring = 16 + Math.sin(now * 0.003) * 1.6;
+      ctx.beginPath();
+      ctx.arc(hx, hy, ring, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(231,197,106,0.95)";
+      ctx.lineWidth = 1.35;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(hx, hy, openR * 0.42, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(126,224,208,0.28)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(hx, hy, 3.2, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(243,236,223,0.95)";
+      ctx.fill();
+    }, isMobile ? 30 : 0);
+  }
+
   // ─── Start ──────────────────────────────────────────────
   initTitleRotator();
   initScene3d();
@@ -2058,6 +2638,7 @@
     initLattice();
     initDNA();
     initChrono();
-    initCoherence();
+    initDough();
+    initPassage();
   });
 })();

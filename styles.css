@@ -38,6 +38,8 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-snap-type: y proximity;
+  scroll-padding-top: var(--nav-h);
   scrollbar-width: thin;
   scrollbar-color: var(--red) #111;
 }
@@ -1335,10 +1337,18 @@ html.is-hero-painting body {
 }
 
 /* Sections */
+.hero,
+.section {
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+}
+
 .section {
   padding: clamp(4.5rem, 10vw, 7rem) clamp(1.25rem, 4vw, 2.5rem);
   max-width: calc(var(--max) + 5rem);
   margin: 0 auto;
+  min-height: 100vh;
+  box-sizing: border-box;
 }
 
 .section-head {
@@ -2827,5 +2837,183 @@ html.is-hero-painting body {
   }
   .partner-card {
     min-height: 72px;
+  }
+}
+
+/* ─── 04 Dough — a body you can press ─── */
+.section.dough {
+  display: flex;
+  align-items: center;
+}
+
+.dough .section-head {
+  margin-bottom: 0;
+  max-width: none;
+}
+
+.dough-layout {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(16rem, 24rem) minmax(0, 1fr);
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+  align-items: center;
+}
+
+.dough-stage {
+  position: relative;
+  border: 1px solid var(--border);
+  background: #140000;
+  min-height: 460px;
+}
+
+#doughCanvas {
+  display: block;
+  width: 100%;
+  height: 460px;
+  min-height: 460px;
+  touch-action: none;
+  cursor: grab;
+}
+
+#doughCanvas:active {
+  cursor: grabbing;
+}
+
+.dough-hint {
+  position: absolute;
+  left: 0.85rem;
+  right: 0.85rem;
+  bottom: 0.75rem;
+  margin: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  color: var(--red);
+  pointer-events: none;
+}
+
+@media (max-width: 860px) {
+  .dough-layout {
+    grid-template-columns: 1fr;
+  }
+  .dough .section-head {
+    margin-bottom: 1.25rem;
+  }
+  .dough-stage,
+  #doughCanvas {
+    min-height: 380px;
+    height: 380px;
+  }
+}
+
+/* ─── 05 Passage — one page, other colour ─── */
+.section.passage {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  background: #140a1c;
+  color: #f3ecdf;
+  scroll-margin-top: calc(var(--nav-h) * -1);
+}
+
+#passageCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.passage-copy {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  padding: calc(var(--nav-h) + 1.25rem) clamp(1.25rem, 5vw, 4rem) clamp(1.15rem, 3.5vh, 2.25rem);
+  max-width: 40rem;
+  background: linear-gradient(180deg, rgba(18, 8, 26, 0) 0%, rgba(18, 8, 26, 0.2) 38%, rgba(18, 8, 26, 0.88) 62%, rgba(20, 10, 28, 0.96) 100%);
+}
+
+.passage-index {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #e7c56a;
+}
+
+.passage-title {
+  margin-top: 0.85rem;
+  font-size: clamp(2.35rem, 5.6vw, 4.4rem);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  color: #f3ecdf;
+}
+
+.passage-title em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  color: #7ee0d0;
+}
+
+.passage-line {
+  margin-top: 0.9rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  color: rgba(243, 236, 223, 0.82);
+  min-height: 1.5em;
+  transition: opacity 0.45s ease;
+}
+
+.passage-worlds {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.5rem;
+  margin-top: 0.95rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(243, 236, 223, 0.42);
+}
+
+.passage-worlds span {
+  color: #e7c56a;
+  margin-right: 0.4rem;
+}
+
+.passage-worlds li.is-lit {
+  color: #f3ecdf;
+}
+
+.passage-worlds li.is-lit span {
+  color: #7ee0d0;
+}
+
+@media (max-width: 760px) {
+  .passage-title {
+    font-size: 2.15rem;
+  }
+  .passage-line {
+    margin-top: 0.65rem;
+    font-size: 1.05rem;
+  }
+  .passage-worlds {
+    margin-top: 0.7rem;
   }
 }

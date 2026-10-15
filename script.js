@@ -288,26 +288,6 @@
     });
   });
 
-  // Field log — light the orbit currently in the read band
-  const fieldEntries = [...document.querySelectorAll(".field-entry")];
-  const fieldRail = [...document.querySelectorAll(".field-rail [data-orbit]")];
-  if (fieldEntries.length && "IntersectionObserver" in window) {
-    const setHot = (id) => {
-      fieldEntries.forEach((el) => el.classList.toggle("is-hot", el.dataset.orbit === id));
-      fieldRail.forEach((el) => el.classList.toggle("is-hot", el.dataset.orbit === id));
-    };
-    const fio = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible) setHot(visible.target.dataset.orbit);
-      },
-      { rootMargin: "-28% 0px -42% 0px", threshold: [0.2, 0.45, 0.7] }
-    );
-    fieldEntries.forEach((el) => fio.observe(el));
-  }
-
   // ─── Ticker ─────────────────────────────────────────────
   const ticker = document.getElementById("tickerTrack");
   if (ticker) {
@@ -322,6 +302,8 @@
       "CRAFT",
       "VELOCITY",
       "SIGNAL",
+      "COHERENCE",
+      "ATTENTION",
     ];
     const html = items.map((t) => `<span>${t}</span><span class="sep">◆</span>`).join("");
     ticker.innerHTML = html + html;
@@ -1868,6 +1850,202 @@
     activateTab("vectors");
   }
 
+  // ═══════════════════════════════════════════════════════
+  // Coherence — Kuramoto oscillators on a Fibonacci sphere
+  // ═══════════════════════════════════════════════════════
+  function initCoherence() {
+    const canvas = document.getElementById("coherenceCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const orderEl = document.getElementById("cohOrder");
+    const kEl = document.getElementById("cohK");
+    const nEl = document.getElementById("cohN");
+    const N = isMobile ? 96 : 160;
+    const nodes = [];
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < N; i++) {
+      const y = 1 - (i / (N - 1)) * 2;
+      const ring = Math.sqrt(Math.max(0, 1 - y * y));
+      const t = golden * i;
+      nodes.push({
+        x: Math.cos(t) * ring,
+        y,
+        z: Math.sin(t) * ring,
+        phase: Math.random() * Math.PI * 2,
+        omega: (Math.random() - 0.5) * 0.7,
+      });
+    }
+    if (nEl) nEl.textContent = String(N);
+
+    let w = 0;
+    let h = 0;
+    const orbit = { rotX: 0.42, rotY: 0.25, auto: true, dragging: false };
+    const pointer = { on: false };
+    let wasOn = false;
+    let K = 0.4;
+    let frame = 0;
+
+    const resize = () => {
+      const dpr = maxDpr;
+      const rect = canvas.getBoundingClientRect();
+      w = rect.width;
+      h = rect.height || 420;
+      canvas.width = (w * dpr) | 0;
+      canvas.height = (h * dpr) | 0;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    onResize(resize);
+    new ResizeObserver(resize).observe(canvas);
+    resize();
+    bindOrbitDrag(canvas, orbit, { sens: isMobile ? 0.022 : 0.012 });
+
+    canvas.addEventListener("pointerenter", (e) => {
+      if (e.pointerType === "mouse") pointer.on = true;
+    });
+    canvas.addEventListener("pointerleave", () => {
+      pointer.on = false;
+    });
+    canvas.addEventListener("pointerdown", () => {
+      pointer.on = true;
+    });
+    canvas.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "mouse") pointer.on = false;
+    });
+    canvas.addEventListener("pointercancel", () => {
+      pointer.on = false;
+    });
+
+    function project(x, y, z) {
+      const cX = Math.cos(orbit.rotX);
+      const sX = Math.sin(orbit.rotX);
+      const cY = Math.cos(orbit.rotY);
+      const sY = Math.sin(orbit.rotY);
+      const y1 = y * cX - z * sX;
+      const z1 = y * sX + z * cX;
+      const x1 = x * cY + z1 * sY;
+      const z2 = -x * sY + z1 * cY;
+      const s = (Math.min(w, h) * 0.38) / (2.55 + z2);
+      return { x: w / 2 + x1 * s, y: h / 2 + y1 * s, z: z2 };
+    }
+
+    function strokeLoop(pts, alpha) {
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.closePath();
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    createRunner(canvas, (now, dt) => {
+      const breathe = 0.28 + 0.22 * (0.5 + 0.5 * Math.sin(now * 0.00045));
+      const target = pointer.on ? 3.1 : breathe;
+      if (wasOn && !pointer.on) {
+        for (const n of nodes) n.phase += (Math.random() - 0.5) * 2.4;
+      }
+      wasOn = pointer.on;
+      K += (target - K) * Math.min(1, (pointer.on ? 0.1 : 0.22) * dt);
+
+      let sx = 0;
+      let sy = 0;
+      for (const n of nodes) {
+        sx += Math.cos(n.phase);
+        sy += Math.sin(n.phase);
+      }
+      const r = Math.hypot(sx, sy) / N;
+      const psi = Math.atan2(sy, sx);
+      const gain = 0.055 * dt;
+      for (const n of nodes) {
+        n.phase += (n.omega + K * r * Math.sin(psi - n.phase)) * gain;
+      }
+
+      if ((frame++ & 3) === 0) {
+        if (orderEl) orderEl.textContent = r.toFixed(2);
+        if (kEl) kEl.textContent = K.toFixed(2);
+      }
+
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.lineWidth = 1;
+      for (let lon = 0; lon < 6; lon++) {
+        const a = (lon / 6) * Math.PI;
+        const pts = [];
+        for (let s = 0; s <= 48; s++) {
+          const t = (s / 48) * Math.PI * 2;
+          pts.push(project(Math.sin(t) * Math.cos(a), Math.cos(t), Math.sin(t) * Math.sin(a)));
+        }
+        strokeLoop(pts, 0.16);
+      }
+      for (let lat = 1; lat <= 3; lat++) {
+        const y = Math.cos((lat / 4) * Math.PI);
+        const ring = Math.sqrt(Math.max(0, 1 - y * y));
+        const pts = [];
+        for (let s = 0; s <= 48; s++) {
+          const t = (s / 48) * Math.PI * 2;
+          pts.push(project(ring * Math.cos(t), y, ring * Math.sin(t)));
+        }
+        strokeLoop(pts, 0.12);
+      }
+
+      if (r > 0.55) {
+        const rad = Math.min(w, h) * 0.28;
+        const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, rad);
+        g.addColorStop(0, `rgba(225,6,0,${(r - 0.55) * 0.55})`);
+        g.addColorStop(1, "rgba(225,6,0,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      const dots = nodes
+        .map((n) => {
+          const p = project(n.x, n.y, n.z);
+          p.align = Math.cos(n.phase - psi);
+          p.phase = n.phase;
+          return p;
+        })
+        .sort((a, b) => a.z - b.z);
+
+      if (r < 0.92) {
+        ctx.lineWidth = 1;
+        for (let i = 0; i < N; i++) {
+          const a = nodes[i];
+          for (let k = 1; k <= 4; k++) {
+            const b = nodes[(i + k) % N];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const dz = a.z - b.z;
+            if (dx * dx + dy * dy + dz * dz > 0.22) continue;
+            let dph = Math.abs(a.phase - b.phase) % (Math.PI * 2);
+            if (dph > Math.PI) dph = Math.PI * 2 - dph;
+            if (dph > 0.85) continue;
+            const pa = project(a.x, a.y, a.z);
+            const pb = project(b.x, b.y, b.z);
+            if (pa.z < -0.15 && pb.z < -0.15) continue;
+            ctx.strokeStyle = `rgba(225,6,0,${0.08 + (1 - dph / 0.85) * 0.28})`;
+            ctx.beginPath();
+            ctx.moveTo(pa.x, pa.y);
+            ctx.lineTo(pb.x, pb.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (const d of dots) {
+        const depth = Math.max(0, Math.min(1, (d.z + 1.15) / 2.1));
+        const hot = (d.align + 1) / 2;
+        const rad = (d.z < -0.05 ? 1.1 : 1.5) + depth * 2.1;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, rad, 0, Math.PI * 2);
+        ctx.fillStyle =
+          hot > 0.62
+            ? `rgba(225,6,0,${0.28 + depth * 0.72})`
+            : `rgba(245,245,245,${0.12 + depth * 0.62})`;
+        ctx.fill();
+      }
+    }, isMobile ? 30 : 0);
+  }
+
   // ─── Start ──────────────────────────────────────────────
   initTitleRotator();
   initScene3d();
@@ -1881,5 +2059,6 @@
     initLattice();
     initDNA();
     initChrono();
+    initCoherence();
   });
 })();

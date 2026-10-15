@@ -38,7 +38,7 @@
       <a href="#engine" data-magnetic>Engine</a>
       <a href="#alliance" data-magnetic>Alliance</a>
       <a href="#grid" data-magnetic>Grid</a>
-      <a href="#dough" data-magnetic>Dough</a>
+      <a href="#canvas" data-magnetic>Canvas</a>
       <a href="#passage" data-magnetic>Passage</a>
       <a href="#contact" class="nav-cta" data-magnetic>Contact</a>
     </nav>
@@ -51,7 +51,7 @@
     <a href="#engine">Engine</a>
     <a href="#alliance">Alliance</a>
     <a href="#grid">Grid</a>
-    <a href="#dough">Dough</a>
+    <a href="#canvas">Canvas</a>
     <a href="#passage">Passage</a>
     <a href="#contact">Contact</a>
   </div>
@@ -497,22 +497,52 @@
       </ol>
     </section>
 
-    <!-- DOUGH -->
-    <section class="section dough" id="dough">
-      <div class="dough-layout">
+    <!-- CANVAS -->
+    <section class="section play" id="canvas">
+      <div class="play-layout">
         <div class="section-head">
-          <p class="eyebrow reveal"><span class="red">04</span> — Dough</p>
+          <p class="eyebrow reveal"><span class="red">04</span> — Canvas</p>
           <h2 class="section-title reveal">
-            A body you can press.<br />
-            <em>It gives, then returns.</em>
+            Make a picture.<br />
+            <em>Anything you want.</em>
           </h2>
           <p class="section-lede reveal">
-            Press into it. Pull a piece away. The white is the skin. The red is what was underneath. It remembers its shape, then lets a little go.
+            A clear page for hands. Draw a line, drop a star, colour a shape. Wipe it when you want a fresh start.
           </p>
         </div>
-        <div class="dough-stage reveal">
-          <canvas id="doughCanvas" aria-label="Soft dough. Press to dent it. Drag to pull it."></canvas>
-          <p class="dough-hint mono">PRESS · PULL · THE RED IS THE INSIDE</p>
+        <div class="play-stage reveal">
+          <canvas id="playCanvas" aria-label="Drawing canvas. Draw, stamp, and colour with the tools below."></canvas>
+          <div class="play-bar" role="toolbar" aria-label="Drawing tools">
+            <div class="play-group">
+              <button type="button" data-tool="draw" class="is-on" aria-pressed="true">Draw</button>
+              <button type="button" data-tool="line" aria-pressed="false">Line</button>
+              <button type="button" data-tool="box" aria-pressed="false">Box</button>
+              <button type="button" data-tool="circle" aria-pressed="false">Circle</button>
+              <button type="button" data-tool="stamp" data-stamp="star" aria-pressed="false">Star</button>
+              <button type="button" data-tool="stamp" data-stamp="heart" aria-pressed="false">Heart</button>
+              <button type="button" data-tool="stamp" data-stamp="sun" aria-pressed="false">Sun</button>
+              <button type="button" data-tool="fill" aria-pressed="false">Fill</button>
+              <button type="button" data-tool="erase" aria-pressed="false">Erase</button>
+            </div>
+            <div class="play-group play-colors">
+              <button type="button" class="play-swatch is-on" data-color="#f5f5f5" style="--swatch:#f5f5f5" aria-label="White"></button>
+              <button type="button" class="play-swatch" data-color="#e10600" style="--swatch:#e10600" aria-label="Red"></button>
+              <button type="button" class="play-swatch" data-color="#f5c542" style="--swatch:#f5c542" aria-label="Yellow"></button>
+              <button type="button" class="play-swatch" data-color="#3cbe7a" style="--swatch:#3cbe7a" aria-label="Green"></button>
+              <button type="button" class="play-swatch" data-color="#3aa0ff" style="--swatch:#3aa0ff" aria-label="Blue"></button>
+              <button type="button" class="play-swatch" data-color="#ff7ab0" style="--swatch:#ff7ab0" aria-label="Pink"></button>
+              <button type="button" class="play-swatch" data-color="#ff8a3d" style="--swatch:#ff8a3d" aria-label="Orange"></button>
+            </div>
+            <div class="play-group">
+              <button type="button" data-size="4" aria-pressed="false">S</button>
+              <button type="button" data-size="12" class="is-on" aria-pressed="true">M</button>
+              <button type="button" data-size="28" aria-pressed="false">L</button>
+            </div>
+            <div class="play-group">
+              <button type="button" id="playUndo">Undo</button>
+              <button type="button" id="playClear">Clear</button>
+            </div>
+          </div>
         </div>
       </div>
     </section>

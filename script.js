@@ -2046,263 +2046,316 @@
   }
 
   // ═══════════════════════════════════════════════════════
-  // Dough — a soft body. Press to dent. Drag to pull.
+  // Canvas — a clear page. Draw, stamp, colour, erase.
   // ═══════════════════════════════════════════════════════
-  function initDough() {
-    const canvas = document.getElementById("doughCanvas");
-    if (!canvas) return;
+  function initCanvas() {
+    const canvas = document.getElementById("playCanvas");
+    const bar = document.querySelector(".play-bar");
+    if (!canvas || !bar) return;
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
 
-    const cols = isMobile ? 7 : 8;
-    const rows = isMobile ? 6 : 6;
-    const pts = [];
+    const PAPER = "#111111";
     let w = 0;
     let h = 0;
-    let spacing = 40;
-    const pointer = { x: -9999, y: -9999, down: false, vx: 0, vy: 0 };
+    let dpr = 1;
+    let tool = "draw";
+    let stamp = "star";
+    let color = "#f5f5f5";
+    let size = 12;
+    let drawing = false;
+    let origin = null;
+    let last = null;
+    let snap = null;
+    const undos = [];
 
-    function layout() {
+    function hexToRgb(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+    }
+
+    function near(r, g, b, tr, tg, tb, tol) {
+      return Math.abs(r - tr) <= tol && Math.abs(g - tg) <= tol && Math.abs(b - tb) <= tol;
+    }
+
+    function ink() {
+      return tool === "erase" ? PAPER : color;
+    }
+
+    function paintSetup() {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = ink();
+      ctx.fillStyle = ink();
+      ctx.lineWidth = size;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+    }
+
+    function pushUndo() {
+      try {
+        undos.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        if (undos.length > 14) undos.shift();
+      } catch (_) {}
+      const undoBtn = document.getElementById("playUndo");
+      if (undoBtn) undoBtn.disabled = undos.length === 0;
+    }
+
+    function undo() {
+      const prev = undos.pop();
+      const undoBtn = document.getElementById("playUndo");
+      if (undoBtn) undoBtn.disabled = undos.length === 0;
+      if (!prev) return;
+      if (prev.width !== canvas.width || prev.height !== canvas.height) return;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.putImageData(prev, 0, 0);
+      ctx.restore();
+    }
+
+    function clearPage() {
+      pushUndo();
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    function resize() {
       const rect = canvas.getBoundingClientRect();
       if (rect.width < 4 || rect.height < 4) return;
+      if (Math.abs(rect.width - w) < 1 && Math.abs(rect.height - h) < 1 && canvas.width > 0) return;
+      const prev = document.createElement("canvas");
+      if (w > 4 && canvas.width > 0) {
+        prev.width = canvas.width;
+        prev.height = canvas.height;
+        prev.getContext("2d").drawImage(canvas, 0, 0);
+      }
       w = rect.width;
       h = rect.height;
-      const dpr = maxDpr;
+      dpr = maxDpr;
       canvas.width = (w * dpr) | 0;
       canvas.height = (h * dpr) | 0;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const cx = w * 0.5;
-      const cy = h * 0.46;
-      const rx = w * 0.34;
-      const ry = h * 0.3;
-      spacing = Math.min((2 * rx) / (cols - 1), (2 * ry) / (rows - 1));
-      const rad = spacing * 0.9;
-
-      if (!pts.length) {
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            const u = c / (cols - 1);
-            const v = r / (rows - 1);
-            const ex = (u - 0.5) * 2;
-            const ey = (v - 0.5) * 2;
-            if (ex * ex + ey * ey > 1.05) continue;
-            pts.push({
-              x: 0,
-              y: 0,
-              vx: 0,
-              vy: 0,
-              u,
-              v,
-              jx: (Math.random() - 0.5) * 0.05,
-              jy: (Math.random() - 0.5) * 0.05,
-              ox: 0,
-              oy: 0,
-              held: false,
-              holdX: 0,
-              holdY: 0,
-              bonds: [],
-            });
-          }
-        }
-      }
-      for (const p of pts) {
-        p.hx = cx + (p.u - 0.5 + p.jx) * 2 * rx;
-        p.hy = cy + (p.v - 0.5 + p.jy) * 2 * ry;
-        p.r = rad;
-        if (!p.placed) {
-          p.x = p.hx;
-          p.y = p.hy;
-          p.placed = true;
-        }
-        p.bonds = [];
-      }
-      for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-          const dx = pts[i].hx - pts[j].hx;
-          const dy = pts[i].hy - pts[j].hy;
-          const dist = Math.hypot(dx, dy);
-          if (dist < spacing * 1.42) {
-            pts[i].bonds.push({ n: pts[j], rest: dist });
-          }
-        }
-      }
+      ctx.fillStyle = PAPER;
+      ctx.fillRect(0, 0, w, h);
+      if (prev.width) ctx.drawImage(prev, 0, 0, w, h);
+      undos.length = 0;
+      const undoBtn = document.getElementById("playUndo");
+      if (undoBtn) undoBtn.disabled = true;
     }
 
-    onResize(layout);
-    new ResizeObserver(layout).observe(canvas);
-    layout();
+    onResize(resize);
+    new ResizeObserver(resize).observe(canvas);
+    resize();
 
-    function setPtr(e) {
+    function mark(selector, btn) {
+      bar.querySelectorAll(selector).forEach((el) => {
+        const on = el === btn;
+        el.classList.toggle("is-on", on);
+        if (el.hasAttribute("aria-pressed")) el.setAttribute("aria-pressed", String(on));
+      });
+    }
+
+    bar.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn || !bar.contains(btn)) return;
+      if (btn.dataset.tool) {
+        tool = btn.dataset.tool;
+        if (btn.dataset.stamp) stamp = btn.dataset.stamp;
+        mark("[data-tool]", btn);
+      } else if (btn.dataset.color) {
+        color = btn.dataset.color;
+        if (tool === "erase") {
+          tool = "draw";
+          const drawBtn = bar.querySelector('[data-tool="draw"]');
+          if (drawBtn) mark("[data-tool]", drawBtn);
+        }
+        mark("[data-color]", btn);
+      } else if (btn.dataset.size) {
+        size = Number(btn.dataset.size);
+        mark("[data-size]", btn);
+      } else if (btn.id === "playUndo") {
+        undo();
+      } else if (btn.id === "playClear") {
+        clearPage();
+      }
+    });
+
+    function pos(e) {
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      if (pointer.x > -1000) {
-        pointer.vx = x - pointer.x;
-        pointer.vy = y - pointer.y;
-      } else {
-        pointer.vx = 0;
-        pointer.vy = 0;
-      }
-      pointer.x = x;
-      pointer.y = y;
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     }
 
-    function release() {
-      pointer.down = false;
-      pointer.vx = 0;
-      pointer.vy = 0;
-      for (const p of pts) p.held = false;
+    function restoreSnap() {
+      if (!snap) return;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(snap, 0, 0);
+      ctx.restore();
+    }
+
+    function takeSnap() {
+      snap = document.createElement("canvas");
+      snap.width = canvas.width;
+      snap.height = canvas.height;
+      snap.getContext("2d").drawImage(canvas, 0, 0);
+    }
+
+    function drawStamp(x, y, kind, radius) {
+      paintSetup();
+      const r = Math.max(10, radius);
+      ctx.beginPath();
+      if (kind === "star") {
+        const spikes = 5;
+        for (let i = 0; i < spikes * 2; i++) {
+          const ang = -Math.PI / 2 + (i * Math.PI) / spikes;
+          const rad = i % 2 ? r * 0.42 : r;
+          const px = x + Math.cos(ang) * rad;
+          const py = y + Math.sin(ang) * rad;
+          if (i) ctx.lineTo(px, py);
+          else ctx.moveTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else if (kind === "heart") {
+        ctx.moveTo(x, y + r * 0.72);
+        ctx.bezierCurveTo(x + r * 1.15, y - r * 0.1, x + r * 0.55, y - r, x, y - r * 0.32);
+        ctx.bezierCurveTo(x - r * 0.55, y - r, x - r * 1.15, y - r * 0.1, x, y + r * 0.72);
+        ctx.fill();
+      } else {
+        ctx.arc(x, y, r * 0.42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2;
+          ctx.moveTo(x + Math.cos(a) * r * 0.58, y + Math.sin(a) * r * 0.58);
+          ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+        }
+        ctx.lineWidth = Math.max(2, r * 0.1);
+        ctx.stroke();
+      }
+    }
+
+    function traceShape(x, y) {
+      paintSetup();
+      ctx.beginPath();
+      if (tool === "line") {
+        ctx.moveTo(origin.x, origin.y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      } else if (tool === "box") {
+        ctx.strokeRect(origin.x, origin.y, x - origin.x, y - origin.y);
+      } else if (tool === "circle") {
+        const rx = Math.max(0.5, Math.abs(x - origin.x) / 2);
+        const ry = Math.max(0.5, Math.abs(y - origin.y) / 2);
+        const cx = (origin.x + x) / 2;
+        const cy = (origin.y + y) / 2;
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    function segment(a, b) {
+      paintSetup();
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    function floodFill(cssX, cssY) {
+      const sx = Math.round(cssX * dpr);
+      const sy = Math.round(cssY * dpr);
+      const pw = canvas.width;
+      const ph = canvas.height;
+      if (sx < 0 || sy < 0 || sx >= pw || sy >= ph) return;
+      const img = ctx.getImageData(0, 0, pw, ph);
+      const d = img.data;
+      const start = (sy * pw + sx) * 4;
+      const tr = d[start];
+      const tg = d[start + 1];
+      const tb = d[start + 2];
+      const fill = hexToRgb(ink());
+      if (near(tr, tg, tb, fill.r, fill.g, fill.b, 8)) return;
+      const stack = [sx, sy];
+      const seen = new Uint8Array(pw * ph);
+      seen[sy * pw + sx] = 1;
+      while (stack.length) {
+        const y = stack.pop();
+        const x = stack.pop();
+        const p = (y * pw + x) * 4;
+        d[p] = fill.r;
+        d[p + 1] = fill.g;
+        d[p + 2] = fill.b;
+        d[p + 3] = 255;
+        const tryN = (nx, ny) => {
+          if (nx < 0 || ny < 0 || nx >= pw || ny >= ph) return;
+          const ip = ny * pw + nx;
+          if (seen[ip]) return;
+          const q = ip * 4;
+          if (!near(d[q], d[q + 1], d[q + 2], tr, tg, tb, 28)) return;
+          seen[ip] = 1;
+          stack.push(nx, ny);
+        };
+        tryN(x + 1, y);
+        tryN(x - 1, y);
+        tryN(x, y + 1);
+        tryN(x, y - 1);
+      }
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.putImageData(img, 0, 0);
+      ctx.restore();
     }
 
     canvas.addEventListener("pointerdown", (e) => {
+      if (w < 4) return;
+      e.preventDefault();
       canvas.setPointerCapture(e.pointerId);
-      pointer.down = true;
-      setPtr(e);
-      pointer.vx = 0;
-      pointer.vy = 0;
-      const reach = Math.max(96, spacing * 1.7);
-      const reach2 = reach * reach;
-      for (const p of pts) {
-        const dx = p.x - pointer.x;
-        const dy = p.y - pointer.y;
-        if (dx * dx + dy * dy < reach2) {
-          p.held = true;
-          p.holdX = dx;
-          p.holdY = dy;
-        } else {
-          p.held = false;
+      const p = pos(e);
+      pushUndo();
+      drawing = true;
+      origin = p;
+      last = p;
+      if (tool === "stamp") {
+        drawStamp(p.x, p.y, stamp, size * 2.4);
+        drawing = false;
+      } else if (tool === "fill") {
+        floodFill(p.x, p.y);
+        drawing = false;
+      } else if (tool === "line" || tool === "box" || tool === "circle") {
+        takeSnap();
+      } else {
+        segment(p, { x: p.x + 0.01, y: p.y });
+      }
+    }, { passive: false });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drawing) return;
+      const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+      const events = coalesced && coalesced.length ? coalesced : [e];
+      if (tool === "draw" || tool === "erase") {
+        for (const ev of events) {
+          const p = pos(ev);
+          segment(last, p);
+          last = p;
         }
+        return;
       }
-    });
-    canvas.addEventListener("pointermove", setPtr);
-    canvas.addEventListener("pointerup", (e) => {
-      release();
-      if (e.pointerType !== "mouse") {
-        pointer.x = -9999;
-        pointer.y = -9999;
-      }
-    });
-    canvas.addEventListener("pointercancel", () => {
-      release();
-      pointer.x = -9999;
-      pointer.y = -9999;
-    });
-    canvas.addEventListener("pointerleave", () => {
-      if (!pointer.down) {
-        pointer.x = -9999;
-        pointer.y = -9999;
-        pointer.vx = 0;
-        pointer.vy = 0;
-      }
+      const p = pos(e);
+      restoreSnap();
+      traceShape(p.x, p.y);
     });
 
-    createRunner(canvas, (now, dt) => {
-      if (!pts.length || w < 4) return;
-      const breathe = Math.sin(now * 0.0011);
-      const reach = Math.max(96, spacing * 1.7);
-      const reach2 = reach * reach;
-      const minDist = spacing * 0.55;
-      const lim = Math.min(w, h) * 0.22;
+    function endDraw() {
+      drawing = false;
+      snap = null;
+      origin = null;
+      last = null;
+    }
+    canvas.addEventListener("pointerup", endDraw);
+    canvas.addEventListener("pointercancel", endDraw);
 
-      for (const p of pts) {
-        const hx = p.hx + p.ox + breathe * 2.2 * Math.cos(p.u * 5.2);
-        const hy = p.hy + p.oy + breathe * 1.6 * Math.sin(p.v * 4.6);
-        let ax = 0;
-        let ay = 0;
-        if (p.held && pointer.down) {
-          ax = (pointer.x + p.holdX - p.x) * 0.62;
-          ay = (pointer.y + p.holdY - p.y) * 0.62;
-          p.ox += (p.x - p.hx - p.ox) * 0.012 * dt;
-          p.oy += (p.y - p.hy - p.oy) * 0.012 * dt;
-          p.ox = Math.max(-lim, Math.min(lim, p.ox));
-          p.oy = Math.max(-lim, Math.min(lim, p.oy));
-        } else {
-          ax = (hx - p.x) * 0.05;
-          ay = (hy - p.y) * 0.05;
-          const dx = p.x - pointer.x;
-          const dy = p.y - pointer.y;
-          const d2 = dx * dx + dy * dy;
-          if (!pointer.down && d2 < reach2 && d2 > 0.25) {
-            const d = Math.sqrt(d2);
-            const push = (1 - d / reach) ** 2 * 4.2;
-            ax += (dx / d) * push;
-            ay += (dy / d) * push;
-          }
-        }
-
-        p.vx = (p.vx + ax * dt) * 0.74;
-        p.vy = (p.vy + ay * dt) * 0.74;
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-      }
-
-      for (const p of pts) {
-        for (const bond of p.bonds) {
-          const o = bond.n;
-          const dx = o.x - p.x;
-          const dy = o.y - p.y;
-          const d = Math.hypot(dx, dy) || 0.001;
-          const extra = d - bond.rest * 1.5;
-          if (extra <= 0) continue;
-          const corr = extra * 0.14;
-          const nx = dx / d;
-          const ny = dy / d;
-          const wP = p.held && pointer.down ? 0.18 : 1;
-          const wO = o.held && pointer.down ? 0.18 : 1;
-          const sum = wP + wO;
-          p.x += nx * corr * (wP / sum);
-          p.y += ny * corr * (wP / sum);
-          o.x -= nx * corr * (wO / sum);
-          o.y -= ny * corr * (wO / sum);
-        }
-      }
-
-      for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-          const a = pts[i];
-          const b = pts[j];
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
-          const d2 = dx * dx + dy * dy;
-          const min2 = minDist * minDist;
-          if (d2 >= min2 || d2 < 0.04) continue;
-          const d = Math.sqrt(d2);
-          const push = (minDist - d) * 0.22;
-          const nx = dx / d;
-          const ny = dy / d;
-          a.x -= nx * push;
-          a.y -= ny * push;
-          b.x += nx * push;
-          b.y += ny * push;
-        }
-      }
-
-      pointer.vx *= 0.7;
-      pointer.vy *= 0.7;
-
-      ctx.fillStyle = "#140000";
-      ctx.fillRect(0, 0, w, h);
-
-      const blur = Math.max(16, spacing * 0.34);
-      ctx.save();
-      ctx.filter = "blur(" + blur.toFixed(1) + "px)";
-      ctx.fillStyle = "#e10600";
-      ctx.beginPath();
-      for (const p of pts) {
-        ctx.moveTo(p.x + p.r * 1.12, p.y);
-        ctx.arc(p.x, p.y, p.r * 1.12, 0, Math.PI * 2);
-      }
-      ctx.fill();
-      ctx.fillStyle = "#f4f4f4";
-      ctx.beginPath();
-      for (const p of pts) {
-        ctx.moveTo(p.x + p.r * 0.86, p.y);
-        ctx.arc(p.x, p.y, p.r * 0.86, 0, Math.PI * 2);
-      }
-      ctx.fill();
-      ctx.restore();
-    }, isMobile ? 30 : 0);
+    const undoBtn = document.getElementById("playUndo");
+    if (undoBtn) undoBtn.disabled = true;
   }
 
   // ═══════════════════════════════════════════════════════
@@ -2638,7 +2691,7 @@
     initLattice();
     initDNA();
     initChrono();
-    initDough();
+    initCanvas();
     initPassage();
   });
 })();
